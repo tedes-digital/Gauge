@@ -56,7 +56,7 @@ The names of your project folders may appear on the card. They come from those h
   - **ChatGPT through the Codex program**
   - **GitHub Copilot through the Copilot command-line tool**
 
-If a tool is not on your Mac, Gauge simply does not show it.
+If a tool is not on your Mac, Gauge simply does not show it. Each tool appears on the card, next to the notch and in the menu bar only after Gauge has found it. If it finds none, the card says "No AI tools found yet" and tells you what to do.
 
 > **Good to know:** Gauge sees what happens *on this Mac*. Chatting on a website (like claude.ai or chatgpt.com), in your phone app, or on another computer is not counted.
 
@@ -163,7 +163,7 @@ You only do this once. It uses an app called **Terminal**, which is already on y
 4. Your web browser opens. Sign in with your ChatGPT account and approve.
 5. Back in Gauge, click ⟳. The ChatGPT row now shows how much of your limit is left, and when it resets.
 
-If you do not use Codex, simply skip this. The ChatGPT row will say it is unavailable, or you can ignore it.
+If you do not use Codex, simply skip this. The ChatGPT row only appears once Gauge finds Codex on your Mac.
 
 ### GitHub Copilot: nothing to do (if you use its command-line tool)
 
@@ -285,8 +285,11 @@ Follow the steps under *The first time you open it* in [section 3](#3-install-ga
 **The card does not open when I move the mouse near the notch.**
 Click the gauge icon in the menu bar instead; it always works. Some work-managed Macs restrict mouse tracking, and then only the icon works.
 
-**The ChatGPT row says "Unavailable".**
+**There is no ChatGPT row, or it says "Unavailable".**
 Codex is probably not installed or not signed in. Follow [the ChatGPT steps](#chatgpt-codex-one-time-setup). Make sure you signed in with your ChatGPT account, not an API key.
+
+**The card says "No AI tools found yet".**
+Gauge did not find Claude Code, Codex or the Copilot command-line tool on this Mac. Install and sign in to at least one, use it once, then click ⟳ on the card.
 
 **There is no Copilot row.**
 It appears only after the Copilot command-line tool has been used on this Mac. If you only use Copilot in VS Code, turn on the exact total (see [section 6](#optional-exact-copilot-total-from-github)).

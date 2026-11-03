@@ -27,6 +27,9 @@ final class CodexLogClient: @unchecked Sendable {
         return base.appendingPathComponent("sessions")
     }
 
+    /// True when Codex has left session logs on this Mac (a sign it is installed and used).
+    var hasLogs: Bool { FileManager.default.fileExists(atPath: root.path) }
+
     /// Tokens per project since `since`, largest first. Empty when there are no Codex logs.
     func projects(since: Date, now: Date = Date()) -> [ProjectUsage] {
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }

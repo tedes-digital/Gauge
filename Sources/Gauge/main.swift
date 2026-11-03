@@ -105,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateUI() {
         let cards = model.cards
         // With a notch, the island already shows the numbers: keep only an icon in the menu bar.
-        if hasNotchScreen && model.showNotch, let icon = NSImage(systemSymbolName: "gauge.medium", accessibilityDescription: "Gauge") {
+        if (cards.isEmpty || (hasNotchScreen && model.showNotch)), let icon = NSImage(systemSymbolName: "gauge.medium", accessibilityDescription: "Gauge") {
             statusItem.button?.image = icon
             statusItem.button?.title = ""
         } else {
@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let perLabelWidth: CGFloat = 60   // badge width per service, to the left of the physical notch
     private static let cardGap: CGFloat = 6           // free space between the island and the card below it
     private static let cardRim: CGFloat = 8           // transparent margin so the spring can overshoot without clipping
-    private var rowCount: Int { model.cards.count }
+    private var rowCount: Int { max(1, model.cards.count) }   // an empty island still shows a placeholder
     private var leftWidth: CGFloat { Self.perLabelWidth * CGFloat(rowCount) }
 
     /// Prefers the display that has a physical notch; otherwise the one with the menu bar.
@@ -228,13 +228,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateBadgeText() {
         let cards = model.cards
-        while badgeLabels.count < cards.count {
+        let slots = max(1, cards.count)   // nothing found yet: one placeholder label
+        while badgeLabels.count < slots {
             let label = makeLabel("", size: 12, weight: .medium)
             label.alignment = .center
             badge.addSubview(label)
             badgeLabels.append(label)
         }
-        while badgeLabels.count > cards.count { badgeLabels.removeLast().removeFromSuperview() }
+        while badgeLabels.count > slots { badgeLabels.removeLast().removeFromSuperview() }
+        if cards.isEmpty {
+            badgeLabels[0].attributedStringValue = NSAttributedString(string: "Gauge", attributes: [
+                .font: badgeLabels[0].font ?? NSFont.systemFont(ofSize: 12), .foregroundColor: Palette.muted])
+            return
+        }
         for (label, card) in zip(badgeLabels, cards) {
             label.attributedStringValue = ProviderIcons.label(card, text: card.barText, font: label.font ?? .systemFont(ofSize: 12),
                                                               color: .white, gap: " ")

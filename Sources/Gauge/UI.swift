@@ -161,6 +161,13 @@ final class DashboardViewController: NSViewController {
         return label
     }()
     private let refreshButton = NSButton()
+    private let emptyLabel: NSTextField = {
+        let label = makeLabel("No AI tools found yet\nInstall and sign in to Claude Code, Codex or GitHub Copilot CLI on this Mac, then press ⟳. Gauge lists each one as soon as it finds it.", size: 11, color: Palette.muted)
+        label.maximumNumberOfLines = 4
+        label.lineBreakMode = .byWordWrapping
+        label.isHidden = true
+        return label
+    }()
 
     init(model: AppModel) {
         self.model = model
@@ -212,6 +219,9 @@ final class DashboardViewController: NSViewController {
         footer.addArrangedSubview(refreshButton)
         footer.heightAnchor.constraint(equalToConstant: 22).isActive = true
         stack.addArrangedSubview(footer)
+        emptyLabel.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        stack.insertArrangedSubview(emptyLabel, at: 1)
+        stack.setCustomSpacing(4, after: emptyLabel)
 
         root.addSubview(details)   // above the stack, so it can cover rows
         view = root
@@ -241,6 +251,10 @@ final class DashboardViewController: NSViewController {
         guard isViewLoaded else { return }
         let cards = model.cards
         syncRows(cards)
+        emptyLabel.isHidden = !cards.isEmpty
+        emptyLabel.stringValue = model.hasScanned
+            ? "No AI tools found yet\nInstall and sign in to Claude Code, Codex or GitHub Copilot CLI on this Mac, then press ⟳. Gauge lists each one as soon as it finds it."
+            : "Looking for your AI tools…"
         for (row, card) in zip(rows, cards) {
             row.name.attributedStringValue = ProviderIcons.label(card, text: card.name, font: row.name.font ?? .systemFont(ofSize: 15), color: card.tint)
             row.status.stringValue = card.cardText

@@ -23,6 +23,9 @@ final class AppModel {
     private(set) var claudeLocal: ClaudeLocalUsage?
     private(set) var codexProjects: [ProjectUsage] = []
     private(set) var codexProjectsWeek: [ProjectUsage] = []
+    private(set) var codexLogsFound = false
+    /// True after the first scan finished, so "nothing found" is never shown while still looking.
+    private(set) var hasScanned = false
     private(set) var copilotUsage: CopilotUsage?
     private(set) var copilotBilling = BillingResult(requests: nil, note: nil)
     private let githubBilling = GitHubBillingClient()
@@ -181,15 +184,23 @@ final class AppModel {
     var billingNote: String? { useGitHubBilling ? copilotBilling.note : nil }
 
     /// The services shown in the card, the notch badge and the menu bar, in display order.
+    /// A service is listed only once Gauge has found it on this Mac: Claude Code logs (or numbers typed in by hand),
+    /// a working Codex login or Codex logs, Copilot CLI logs.
+    private var claudeDetected: Bool { (useClaudeCode && claudeLocal != nil) || claudeSession >= 0 || claudeWeekly >= 0 }
+    private var codexDetected: Bool { !windows.isEmpty || codexCredits != nil || codexLogsFound }
+
     var cards: [ProviderCard] {
-        var list = [
-            ProviderCard(id: "claude", glyph: "✳", name: "Claude", tint: Palette.orange, barText: claudeBarText,
-                         cardText: claudeCardText, progress: claudeProgress, progressIsExact: manualClaudeFresh, caption: claudeCaption,
-                         lines: rows(claudeProjectLines)),
-            ProviderCard(id: "codex", glyph: "✦", name: "ChatGPT", tint: Palette.blue, barText: codexBarText,
-                         cardText: codexCardText, progress: codexProgress,
-                         lines: codexWindowLines + rows(codexProjectLines))
-        ]
+        var list: [ProviderCard] = []
+        if claudeDetected {
+            list.append(ProviderCard(id: "claude", glyph: "✳", name: "Claude", tint: Palette.orange, barText: claudeBarText,
+                                     cardText: claudeCardText, progress: claudeProgress, progressIsExact: manualClaudeFresh,
+                                     caption: claudeCaption, lines: rows(claudeProjectLines)))
+        }
+        if codexDetected {
+            list.append(ProviderCard(id: "codex", glyph: "✦", name: "ChatGPT", tint: Palette.blue, barText: codexBarText,
+                                     cardText: codexCardText, progress: codexProgress,
+                                     lines: codexWindowLines + rows(codexProjectLines)))
+        }
         if let copilot = copilotCard { list.append(copilot) }
         return list
     }
@@ -270,6 +281,7 @@ final class AppModel {
                 ?? Date().addingTimeInterval(-5 * 3600)
             let projects = codexLog.projects(since: since)
             let week = codexLog.projects(since: Date().addingTimeInterval(-7 * 86400))
+            let codexFound = codexLog.hasLogs
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.busy = false
@@ -278,6 +290,8 @@ final class AppModel {
                 self.copilotUsage = copilot
                 self.copilotBilling = billing
                 self.codexProjectsWeek = week
+                self.codexLogsFound = codexFound
+                self.hasScanned = true
                 switch result {
                 case .success(let limits):
                     self.windows = limits.windows
