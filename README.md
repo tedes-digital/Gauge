@@ -1,10 +1,30 @@
 # Gauge
 
+<p align="center">
+  <img src="docs/banner.png" alt="Gauge: your Claude Code, ChatGPT and GitHub Copilot usage right beside the notch" width="100%">
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/tedes-digital/Gauge?color=E9572C&label=release" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-E9572C" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-E9572C" alt="macOS 14 or newer">
+  <img src="https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-E9572C" alt="Apple Silicon and Intel">
+</p>
+
 **Gauge shows how much of your AI tools you have used, right at the top of your Mac screen.**
 
 It works with **Claude Code**, **ChatGPT (Codex)** and **GitHub Copilot**. You glance at the top of the screen, you see the numbers, you move on. No windows to open, no websites to visit.
 
 On a MacBook with a notch, the numbers sit next to the notch. Move the mouse onto them and a small card opens with more detail.
+
+### What you get
+
+- **A glance at the top of the screen:** a logo and a short value per tool beside the notch (or in the menu bar on Macs without one).
+- **A card on hover** with a progress bar per tool and a breakdown by project.
+- **Claude Code:** what the current 5-hour session cost, in dollars at API prices or in tokens, plus your **real limit and reset time** (or your company's spend and budget) once you connect it with one click.
+- **ChatGPT (Codex):** your real 5-hour and weekly limits with reset countdowns, and optional alerts.
+- **GitHub Copilot:** premium requests this month against your plan's allowance, with an optional exact total from GitHub.
+- **Private by design:** open source (MIT), no cookies, no passwords, no data collected, nothing leaves your Mac.
 
 > You do not need to be technical to use Gauge. This guide explains every step in plain words.
 
@@ -34,7 +54,7 @@ Short answer: **yes. Gauge keeps everything on your Mac.**
 - **No cookies.** Gauge never looks at your web browser, your logins or your cookies.
 - **No passwords.** It never asks for a password, a key or a token, and it never stores one.
 - **No data collected.** There is no tracking, no analytics and no account. Nothing about you or your usage is sent to the author or to anyone else.
-- **No internet connection of its own.** Gauge does not talk to any server. The only time it touches the web is when *you* press the button **Open Claude Usage**, which simply opens a web page in your browser.
+- **No internet connection of its own.** Gauge does not talk to any server. The only time it touches the web is when *you* press the button **Open Claude usage page**, which simply opens a web page in your browser.
 - **Open source.** Every line of the program is public on GitHub, under the free [MIT license](LICENSE). Anyone can read it, check it, and build the app themselves. You do not have to take our word for it.
 
 **What Gauge actually does:** it reads small "history" files that your AI tools already save on your own Mac (for example, a note each time Claude Code answers you), and adds them up. It only *reads* them. It never changes or deletes them.
@@ -207,6 +227,16 @@ If it does not work (for example because your company manages your GitHub accoun
 
 ## 7. How to read the card
 
+<p align="center">
+  <img src="docs/card.png" alt="The Gauge island next to the notch and the card below it, with numbered callouts" width="640">
+</p>
+
+1. **The island** next to the notch: a logo and a short value for each tool. This is what you see all the time.
+2. **The tool's logo and name.** Move the mouse onto a row to see a breakdown.
+3. **The main figure** on the right: how much is left (or how much you used) and when it resets.
+4. **The bar**: how much is left. It turns red when little is left.
+5. **Buttons**: the gear opens Settings, the power button quits Gauge. The arrow at the bottom right reloads the numbers.
+
 The card has one row per tool. Each row has:
 
 - **The tool's logo and name** (Claude, ChatGPT, Copilot).
@@ -220,7 +250,7 @@ What the text means for each tool:
 |------|------|---------|
 | **Claude** | `$10.8` and the note *This 5-hour session · 1h 18m left* | What this 5-hour session cost at normal public prices, and how long until the session ends. In tokens mode, it shows a token count instead of dollars. |
 | **Claude** (idle) | `$270` and the note *No active session · last 7 days* | No session is running. This is the total for the last 7 days. |
-| **Claude** (limits connected) | `29% left · 1h 14m` and a bar | Your real limit: how much is left in the tightest window (5-hour or weekly) and when it resets. With a company spend limit it reads like `$314 / $500 · 12d`. If Claude Code has not reported for a while it says *Stale*. |
+| **Claude** (limits connected) | `29% left · 1h 14m` and a bar | Your real limit: how much is left in the tightest window (5-hour or weekly) and when it resets. With a company spend limit it reads like `$314 / $500 · 12d 3h`. If Claude Code has not reported for a while it says *Stale*. |
 | **Claude** (with percentages typed in) | `62% left` and a bar | The percentage you copied from the Claude website. |
 | **ChatGPT** | `79% left · 3d 4h` | How much of your limit is left, and when it resets. |
 | **Copilot** | `12 / 300 req` | Requests used this month out of your monthly allowance. |
@@ -236,6 +266,10 @@ The numbers next to the notch are the same values in short form.
 Open Settings with the **gear** on the card, or right-click the menu-bar icon → **Settings…**. The window has four tabs, one per tool, plus **General**. Each setting lives only in its own tab.
 
 ### Claude tab
+
+<p align="center">
+  <img src="docs/settings-claude.png" alt="The Claude tab in Gauge Settings" width="480">
+</p>
 
 **Usage on this Mac**
 
@@ -267,12 +301,20 @@ Only needed if you do not connect real limits. Copy the percentages from claude.
 
 ### ChatGPT tab
 
+<p align="center">
+  <img src="docs/settings-chatgpt.png" alt="The ChatGPT tab in Gauge Settings" width="480">
+</p>
+
 | Setting | What it does |
 |---------|--------------|
 | **Refresh now** | Asks Codex for fresh numbers right away. |
 | **Notify me when my limit is almost used up** | Sends a normal macOS notification when your ChatGPT (Codex) limit reaches 20%, 10% and 0% left. macOS asks your permission the first time. |
 
 ### Copilot tab
+
+<p align="center">
+  <img src="docs/settings-copilot.png" alt="The Copilot tab in Gauge Settings" width="480">
+</p>
 
 | Setting | What it does |
 |---------|--------------|
@@ -281,6 +323,10 @@ Only needed if you do not connect real limits. Copy the percentages from claude.
 | **Use GitHub billing for the exact total** | Off by default. On: asks GitHub for your real total, including VS Code and the website. Needs the one-time setup in [section 6](#optional-exact-copilot-total-from-github). |
 
 ### General tab
+
+<p align="center">
+  <img src="docs/settings-general.png" alt="The General tab in Gauge Settings" width="480">
+</p>
 
 | Setting | What it does |
 |---------|--------------|
@@ -328,8 +374,8 @@ Your company's Claude Code settings only allow status lines that the company man
 **Claude shows a note instead of a bar, or says `Stale`.**
 The real limit appears after you click **Connect Claude limits** and Claude Code replies once. It says *Stale* when Claude Code has not reported for a while (for example if you only use Claude on the website). Numbers refresh every few minutes; click ⟳ to refresh now.
 
-**Claude shows `Idle` or an old number.**
-Numbers refresh every few minutes. Click ⟳ on the card to refresh now.
+**Claude says "No active session" or shows an old number.**
+"No active session" is normal when you have not used Claude Code for five hours: the session starts again with your next message. Numbers refresh every few minutes; click ⟳ on the card to refresh now.
 
 **I turned on "Open Gauge when I log in", but it does not start.**
 Make sure Gauge is in the **Applications** folder, then switch the setting off and on again, or add it in **System Settings → General → Login Items** (see [section 5](#5-start-gauge-automatically-when-you-turn-on-your-mac)).
