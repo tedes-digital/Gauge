@@ -67,7 +67,7 @@ final class AppModel {
     var codexStale: Bool { error != nil || lastUpdated == nil || (lastUpdated.map { now.timeIntervalSince($0) > Double(refreshMinutes * 60 + 90) } ?? true) }
     /// What Claude Code reports about the real limits, ready to show. Windows that already reset count as unused.
     private struct ClaudeExact {
-        let remaining: Double          // 0...1, the tightest limit
+        let used: Double               // 0...1, the tightest limit
         let barText: String
         let cardText: String
         let lines: [(name: String, value: String)]
@@ -76,44 +76,44 @@ final class AppModel {
         guard let limits = claudeLimits, now.timeIntervalSince(limits.updatedAt) < 7 * 86400 else { return nil }
         let stale = now.timeIntervalSince(limits.updatedAt) > 90 * 60
         let suffix = stale ? " · Stale" : ""
-        func left(_ w: ClaudeLimitWindow) -> (fraction: Double, resets: Date?) {
-            if let r = w.resetsAt, r <= now { return (1, nil) }   // window rolled over since the last report
-            return (max(0, min(1, 1 - w.usedPercent / 100)), w.resetsAt)
+        func usedIn(_ w: ClaudeLimitWindow) -> (fraction: Double, resets: Date?) {
+            if let r = w.resetsAt, r <= now { return (0, nil) }   // window rolled over since the last report
+            return (max(0, min(1, w.usedPercent / 100)), w.resetsAt)
         }
         func percent(_ f: Double) -> String { "\(Int((f * 100).rounded()))%" }
         var lines: [(name: String, value: String)] = []
 
         if let spend = limits.spend {
-            var fraction = max(0, min(1, 1 - spend.usedPercent / 100))
+            var fraction = max(0, min(1, spend.usedPercent / 100))
             var resets = spend.resetsAt
-            if let r = resets, r <= now { fraction = 1; resets = nil }
+            if let r = resets, r <= now { fraction = 0; resets = nil }
             let period = spend.period.map { "\($0.capitalized) spend limit" } ?? "Spend limit"
             let amount: String
             if let used = spend.usedUSD, let limit = spend.limitUSD { amount = "\(money(used)) / \(money(limit))" }
-            else { amount = "\(percent(fraction)) left" }
+            else { amount = "\(percent(fraction)) used" }
             lines.append((period, amount))
             if let window = limits.fiveHour { lines.append(("5-hour limit", windowValue(window))) }
             if let window = limits.sevenDay { lines.append(("Weekly limit", windowValue(window))) }
             let countdown = shortCountdown(resets, now: now).map { " · \($0)" } ?? ""
-            return ClaudeExact(remaining: fraction, barText: spend.usedUSD.map(money) ?? percent(fraction),
+            return ClaudeExact(used: fraction, barText: spend.usedUSD.map(money) ?? percent(fraction),
                                cardText: amount + countdown + suffix, lines: lines)
         }
         var candidates: [(label: String, fraction: Double, resets: Date?)] = []
-        if let w = limits.fiveHour { let l = left(w); candidates.append(("5-hour limit", l.fraction, l.resets)) }
-        if let w = limits.sevenDay { let l = left(w); candidates.append(("Weekly limit", l.fraction, l.resets)) }
-        guard let tightest = candidates.min(by: { $0.fraction < $1.fraction }) else { return nil }
+        if let w = limits.fiveHour { let l = usedIn(w); candidates.append(("5-hour limit", l.fraction, l.resets)) }
+        if let w = limits.sevenDay { let l = usedIn(w); candidates.append(("Weekly limit", l.fraction, l.resets)) }
+        guard let tightest = candidates.max(by: { $0.fraction < $1.fraction }) else { return nil }
         lines = candidates.map { c in
             let countdown = shortCountdown(c.resets, now: now).map { " · \($0)" } ?? ""
-            return (name: c.label, value: "\(percent(c.fraction)) left" + countdown)
+            return (name: c.label, value: "\(percent(c.fraction)) used" + countdown)
         }
         let countdown = shortCountdown(tightest.resets, now: now).map { " · \($0)" } ?? ""
-        return ClaudeExact(remaining: tightest.fraction, barText: percent(tightest.fraction),
-                           cardText: "\(percent(tightest.fraction)) left" + countdown + suffix, lines: lines)
+        return ClaudeExact(used: tightest.fraction, barText: percent(tightest.fraction),
+                           cardText: "\(percent(tightest.fraction)) used" + countdown + suffix, lines: lines)
     }
     private func windowValue(_ w: ClaudeLimitWindow) -> String {
-        if let r = w.resetsAt, r <= now { return "100% left" }
+        if let r = w.resetsAt, r <= now { return "0% used" }
         let countdown = shortCountdown(w.resetsAt, now: now).map { " · \($0)" } ?? ""
-        return "\(Int((max(0, 100 - w.usedPercent)).rounded()))% left" + countdown
+        return "\(Int(max(0, min(100, w.usedPercent)).rounded()))% used" + countdown
     }
 
     private var manualClaudeFresh: Bool { claudeSession >= 0 && !claudeStale }
@@ -121,19 +121,19 @@ final class AppModel {
     private func claudeAmount(tokens: Int, cost: Double) -> String { claudeUnit == "dollars" ? money(cost) : compactTokens(tokens) }
     var claudeBarText: String {
         if let exact = claudeExact { return exact.barText }
-        if manualClaudeFresh { return "\(claudeSession)%" }
+        if manualClaudeFresh { return "\(100 - claudeSession)%" }
         if let local = claudeLocal {
             return claudeAmount(tokens: local.sessionTokens ?? local.weeklyTokens, cost: local.sessionCost ?? local.weeklyCost)
         }
-        return claudeSession >= 0 ? "\(claudeSession)%" : "—"
+        return claudeSession >= 0 ? "\(100 - claudeSession)%" : "—"
     }
-    /// 0...1 for the Claude bar: remaining % when known, otherwise the time left in the current 5-hour session.
+    /// 0...1 for the Claude bar: share used when known, otherwise the time left in the current 5-hour session (shown as a caption, not a bar).
     var claudeProgress: Double? {
-        if let exact = claudeExact { return exact.remaining }
-        if manualClaudeFresh { return Double(claudeSession) / 100 }
+        if let exact = claudeExact { return exact.used }
+        if manualClaudeFresh { return Double(100 - claudeSession) / 100 }
         if let local = claudeLocal, let resets = local.sessionResetsAt { return max(0, min(1, resets.timeIntervalSince(now) / (5 * 3600))) }
         if claudeLocal != nil { return 1 }
-        return claudeSession >= 0 ? Double(claudeSession) / 100 : nil
+        return claudeSession >= 0 ? Double(100 - claudeSession) / 100 : nil
     }
     /// Per-project lines for the card (at most 4 rows; the rest are folded into "+N more").
     private func lines(_ projects: [ProjectUsage], amount: (Int, Double) -> String) -> [(name: String, tokens: String)] {
@@ -178,19 +178,19 @@ final class AppModel {
         return codexProjectsWeek.isEmpty ? [] : idleLines("No activity in this window", week: codexProjectsWeek)
     }
     private var codexBarText: String {
-        if let codex = shortestCodex { return "\(codexStale ? "~" : "")\(Int(codex.remainingPercent.rounded()))%" }
+        if let codex = shortestCodex { return "\(codexStale ? "~" : "")\(Int(codex.usedPercent.rounded()))%" }
         if codexCredits?.unlimited == true { return "∞" }
-        if codexSpendReached { return "0" }
+        if codexSpendReached { return "100%" }
         if let balance = codexCredits?.balance, codexCredits?.hasCredits == true { return balance }
         return "—"
     }
     private var codexCardText: String {
         if codexSpendReached { return "Spend limit reached" }
         if let codex = shortestCodex {
-            let remaining = "\(Int(codex.remainingPercent.rounded()))% left"
-            if codexStale { return "\(remaining) · Stale" }
-            if let countdown = shortCountdown(codex.resetsAt, now: now) { return "\(remaining) · \(countdown)" }
-            return remaining
+            let used = "\(Int(codex.usedPercent.rounded()))% used"
+            if codexStale { return "\(used) · Stale" }
+            if let countdown = shortCountdown(codex.resetsAt, now: now) { return "\(used) · \(countdown)" }
+            return used
         }
         // No percent windows: admin-managed or credit-based plan.
         if let credits = codexCredits {
@@ -207,18 +207,18 @@ final class AppModel {
         case nil: return "Limit"
         }
     }
-    /// One line per rate-limit window ("Weekly limit  79% · 3d 4h"), shown before the per-project list.
+    /// One line per rate-limit window ("Weekly limit  21% · 3d 4h"), shown before the per-project list.
     private var codexWindowLines: [(name: String, value: String)] {
         windows.sorted { ($0.durationMinutes ?? 0) < ($1.durationMinutes ?? 0) }.map { w in
-            let left = "\(Int(w.remainingPercent.rounded()))%"
-            let value = shortCountdown(w.resetsAt, now: now).map { "\(left) · \($0)" } ?? left
+            let used = "\(Int(w.usedPercent.rounded()))%"
+            let value = shortCountdown(w.resetsAt, now: now).map { "\(used) · \($0)" } ?? used
             return (name: windowLabel(w.durationMinutes), value: value)
         }
     }
     private var codexProgress: Double? {
-        if let codex = shortestCodex { return codex.remainingPercent / 100 }
-        if codexSpendReached { return 0 }
-        if codexCredits?.unlimited == true { return 1 }
+        if let codex = shortestCodex { return codex.usedPercent / 100 }
+        if codexSpendReached { return 1 }
+        if codexCredits?.unlimited == true { return 0 }
         return nil
     }
     private func rows(_ items: [(name: String, tokens: String)]) -> [(name: String, value: String)] {
@@ -243,7 +243,7 @@ final class AppModel {
         return ProviderCard(id: "copilot", glyph: "◆", name: "Copilot", tint: Palette.green,
                             barText: formatRequests(used),
                             cardText: "\(formatRequests(used)) / \(limit) req",
-                            progress: max(0, 1 - used / Double(limit)), lines: lines)
+                            progress: min(1, used / Double(limit)), lines: lines)
     }
 
     /// Why GitHub billing could not be read (nil when it works or is off). Shown in Settings.
@@ -282,18 +282,19 @@ final class AppModel {
     }
     var claudeCardText: String {
         if let exact = claudeExact { return exact.cardText }
-        if manualClaudeFresh { return "\(claudeSession)% left" }
+        if manualClaudeFresh { return "\(100 - claudeSession)% used" }
         if let local = claudeLocal {
             if let tokens = local.sessionTokens {
                 return claudeAmount(tokens: tokens, cost: local.sessionCost ?? 0)
             }
             return claudeAmount(tokens: local.weeklyTokens, cost: local.weeklyCost)
         }
-        if claudeSession >= 0 { return "\(claudeSession)% left · Stale" }
-        if claudeWeekly >= 0 { return "\(claudeWeekly)% weekly" }
+        if claudeSession >= 0 { return "\(100 - claudeSession)% used · Stale" }
+        if claudeWeekly >= 0 { return "\(100 - claudeWeekly)% weekly used" }
         return "No data"
     }
-    var shortestCodex: UsageWindow? { windows.min { $0.remainingPercent < $1.remainingPercent } }
+    /// The window that is closest to its limit (the most used one).
+    var shortestCodex: UsageWindow? { windows.max { $0.usedPercent < $1.usedPercent } }
 
     private init() {
         claudeSession = defaults.object(forKey: "claudeSession") as? Int ?? -1
@@ -412,7 +413,7 @@ final class AppModel {
             guard band < previous, band != 101 else { continue }
             let note = UNMutableNotificationContent()
             note.title = "Codex usage warning"
-            note.body = "\(item.name): \(Int(remaining.rounded()))% remaining"
+            note.body = "\(item.name): \(Int((100 - remaining).rounded()))% used"
             UNUserNotificationCenter.current().add(
                 UNNotificationRequest(identifier: UUID().uuidString, content: note, trigger: nil)
             ) { _ in }

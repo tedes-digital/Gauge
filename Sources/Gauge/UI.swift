@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Thin rounded progress bar. `progress` is 0...1 of the remaining amount; nil shows an empty track.
+/// Thin rounded progress bar. `progress` is 0...1 of the amount used; nil shows an empty track.
 @MainActor
 final class ProgressBar: NSView {
     private let fill = CALayer()
@@ -27,8 +27,8 @@ final class ProgressBar: NSView {
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.25)
         fill.frame = CGRect(x: 0, y: 0, width: bounds.width * value, height: bounds.height)
-        // Turn red when little is left.
-        let low = isExact && (progress.map { $0 <= 0.15 } ?? false)
+        // Turn red when the limit is nearly used up.
+        let low = isExact && (progress.map { $0 >= 0.85 } ?? false)   // nearly used up
         fill.backgroundColor = (low ? NSColor.systemRed : (isExact ? tint : NSColor(calibratedWhite: 0.5, alpha: 1))).cgColor
         CATransaction.commit()
     }
@@ -494,7 +494,7 @@ final class SettingsWindowController: NSWindowController, NSTabViewDelegate {
         manualButtons.addArrangedSubview(actionButton("Clear", target: self, action: #selector(clearClaude)))
         manualButtons.addArrangedSubview(actionButton("Open Claude usage page", target: self, action: #selector(openClaude)))
         [help("Only needed if you do not connect real limits above. Copy the percentages from claude.ai → Settings → Usage. A value saved less than an hour ago is shown instead of dollars or tokens."),
-         settingsRow("5-hour window left", control: session), settingsRow("Weekly limit left", control: weekly),
+         settingsRow("5-hour window used", control: session), settingsRow("Weekly limit used", control: weekly),
          settingsRow("Window resets at", control: resetPicker), manualButtons].forEach { manualBody.addArrangedSubview($0) }
         let manualBlock = verticalStack(spacing: 8)
         manualBlock.addArrangedSubview(manualHeader)
@@ -514,7 +514,7 @@ final class SettingsWindowController: NSWindowController, NSTabViewDelegate {
         addTab("ChatGPT", [
             group("Limits", [help("Gauge asks the Codex program on this Mac for your limits and when they reset. Sign in once with your ChatGPT account using the command codex login."),
                               actionButton("Refresh now", target: self, action: #selector(refresh))]),
-            group("Alerts", [notifyCheckbox, help("A normal macOS notification at 20%, 10% and 0% left. macOS asks your permission the first time.")])
+            group("Alerts", [notifyCheckbox, help("A normal macOS notification when 80%, 90% and 100% of your limit is used. macOS asks your permission the first time.")])
         ])
         addTab("Copilot", [
             group("Usage", [copilotCheckbox, settingsRow("Monthly requests", control: copilotLimitField),
@@ -563,8 +563,9 @@ final class SettingsWindowController: NSWindowController, NSTabViewDelegate {
     }
     func reload() {
         updateLimitsUI()
-        session.selectItem(at: model.claudeSession + 1)
-        weekly.selectItem(at: model.claudeWeekly + 1)
+        // The model keeps "% left" (as before); the pickers show "% used", like claude.ai does.
+        session.selectItem(at: model.claudeSession < 0 ? 0 : (100 - model.claudeSession) + 1)
+        weekly.selectItem(at: model.claudeWeekly < 0 ? 0 : (100 - model.claudeWeekly) + 1)
         resetPicker.dateValue = model.claudeReset
         copilotCheckbox.state = model.useCopilot ? .on : .off
         copilotLimitField.stringValue = String(model.copilotLimit)
@@ -579,7 +580,10 @@ final class SettingsWindowController: NSWindowController, NSTabViewDelegate {
         status.stringValue = model.loginError ?? "Gauge keeps everything on this Mac. It never asks for passwords, reads cookies or sends your data anywhere."
         status.textColor = model.loginError == nil ? .secondaryLabelColor : .systemOrange
     }
-    @objc private func saveClaude() { model.saveClaude(session: session.indexOfSelectedItem - 1, weekly: weekly.indexOfSelectedItem - 1, reset: resetPicker.dateValue) }
+    @objc private func saveClaude() {
+        func left(_ index: Int) -> Int { index <= 0 ? -1 : 100 - (index - 1) }   // picker shows "used"
+        model.saveClaude(session: left(session.indexOfSelectedItem), weekly: left(weekly.indexOfSelectedItem), reset: resetPicker.dateValue)
+    }
     @objc private func clearClaude() { model.clearClaude(); reload() }
     @objc private func openClaude() { NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!) }
     @objc private func refresh() { model.refresh() }

@@ -20,7 +20,7 @@ On a MacBook with a notch, the numbers sit next to the notch. Move the mouse ont
 ### What you get
 
 - **A glance at the top of the screen:** a logo and a short value per tool beside the notch (or in the menu bar on Macs without one).
-- **A card on hover** with a progress bar per tool and a breakdown by project.
+- **A card on hover** with a progress bar per tool and a breakdown by project. Everything is shown as **what you have used**, so a bigger number or a fuller bar always means more spent.
 - **Claude Code:** what the current 5-hour session cost, in dollars at API prices or in tokens, plus your **real limit and reset time** (or your company's spend and budget) once you connect it with one click.
 - **ChatGPT (Codex):** your real 5-hour and weekly limits with reset countdowns, and optional alerts.
 - **GitHub Copilot:** premium requests this month against your plan's allowance, with an optional exact total from GitHub.
@@ -174,7 +174,7 @@ Claude does not let other programs read your limit directly, but Claude Code its
 1. Open Gauge's **Settings** (gear on the card) and go to the **Claude** tab.
 2. Under **Real limits from Claude Code**, click **Connect Claude limits**.
 3. Gauge explains what it will change. Click **Connect**.
-4. Use Claude Code as usual. After its next reply, the Claude row shows your real percentage left and when it resets. Claude Code sessions that were already open may need a restart.
+4. Use Claude Code as usual. After its next reply, the Claude row shows how much of your real limit you have used and when it resets. Claude Code sessions that were already open may need a restart.
 
 What this does: it adds one entry called `statusLine` to Claude Code's settings file (`~/.claude/settings.json`). Gauge saves a backup copy next to it first (`settings.json.gauge-backup`). If you already have your own status line, it keeps working: Gauge passes the information on to it. Click **Disconnect** in the same place to put everything back exactly as it was.
 
@@ -197,7 +197,7 @@ You only do this once. It uses an app called **Terminal**, which is already on y
    ```
 
 4. Your web browser opens. Sign in with your ChatGPT account and approve.
-5. Back in Gauge, click ⟳. The ChatGPT row now shows how much of your limit is left, and when it resets.
+5. Back in Gauge, click ⟳. The ChatGPT row now shows how much of your limit you have used, and when it resets.
 
 If you do not use Codex, simply skip this. The ChatGPT row only appears once Gauge finds Codex on your Mac.
 
@@ -233,15 +233,15 @@ If it does not work (for example because your company manages your GitHub accoun
 
 1. **The island** next to the notch: a logo and a short value for each tool. This is what you see all the time.
 2. **The tool's logo and name.** Move the mouse onto a row to see a breakdown.
-3. **The main figure** on the right: how much is left (or how much you used) and when it resets.
-4. **The bar**: how much is left. It turns red when little is left.
+3. **The main figure** on the right: how much you have used, and when it resets.
+4. **The bar**: how much of the limit is used. It fills as you spend and turns red when it is nearly used up.
 5. **Buttons**: the gear opens Settings, the power button quits Gauge. The arrow at the bottom right reloads the numbers.
 
 The card has one row per tool. Each row has:
 
 - **The tool's logo and name** (Claude, ChatGPT, Copilot).
-- **A number on the right**, for example `$10.8` or `79% left`.
-- **A coloured bar** underneath that shows how much is left. It turns **red** when little is left.
+- **A number on the right**, for example `$10.8` or `21% used`.
+- **A coloured bar** underneath that fills as you use more. It turns **red** when you are close to the limit.
 - For Claude, if you have neither connected the limits nor typed in percentages, a **short note** instead of a bar, saying what the number is (see below). Without your real limit there is nothing true to draw as a bar.
 
 What the text means for each tool:
@@ -250,9 +250,9 @@ What the text means for each tool:
 |------|------|---------|
 | **Claude** | `$10.8` and the note *This 5-hour session · 1h 18m left* | What this 5-hour session cost at normal public prices, and how long until the session ends. In tokens mode, it shows a token count instead of dollars. |
 | **Claude** (idle) | `$270` and the note *No active session · last 7 days* | No session is running. This is the total for the last 7 days. |
-| **Claude** (limits connected) | `29% left · 1h 14m` and a bar | Your real limit: how much is left in the tightest window (5-hour or weekly) and when it resets. With a company spend limit it reads like `$314 / $500 · 12d 3h`. If Claude Code has not reported for a while it says *Stale*. |
-| **Claude** (with percentages typed in) | `62% left` and a bar | The percentage you copied from the Claude website. |
-| **ChatGPT** | `79% left · 3d 4h` | How much of your limit is left, and when it resets. |
+| **Claude** (limits connected) | `38% used · 2h 10m` and a bar | Your real limit: how much of the fullest window (5-hour or weekly) is used and when it resets. With a company spend limit it reads like `$314 / $500 · 12d 3h`. If Claude Code has not reported for a while it says *Stale*. |
+| **Claude** (with percentages typed in) | `38% used` and a bar | The percentage you copied from the Claude website. |
+| **ChatGPT** | `21% used · 3d 4h` | How much of your limit is used, and when it resets. |
 | **Copilot** | `12 / 300 req` | Requests used this month out of your monthly allowance. |
 
 **Move the mouse onto a row** to see a breakdown: which projects used how much. For ChatGPT it also shows both limits (the 5-hour one and the weekly one) with their reset times.
@@ -292,8 +292,8 @@ Only needed if you do not connect real limits. Copy the percentages from claude.
 
 | Setting | What it does |
 |---------|--------------|
-| **5-hour window left** | The percentage left in your 5-hour window. |
-| **Weekly limit left** | The percentage left for the week. |
+| **5-hour window used** | The percentage used in your 5-hour window, as claude.ai shows it. |
+| **Weekly limit used** | The percentage used for the week. |
 | **Window resets at** | When your 5-hour window resets. |
 | **Save** | Saves the three values above. |
 | **Clear** | Deletes the saved values. |
@@ -308,7 +308,7 @@ Only needed if you do not connect real limits. Copy the percentages from claude.
 | Setting | What it does |
 |---------|--------------|
 | **Refresh now** | Asks Codex for fresh numbers right away. |
-| **Notify me when my limit is almost used up** | Sends a normal macOS notification when your ChatGPT (Codex) limit reaches 20%, 10% and 0% left. macOS asks your permission the first time. |
+| **Notify me when my limit is almost used up** | Sends a normal macOS notification when your ChatGPT (Codex) limit is 80%, 90% and 100% used. macOS asks your permission the first time. |
 
 ### Copilot tab
 
@@ -338,6 +338,7 @@ Only needed if you do not connect real limits. Copy the percentages from claude.
 
 ## 9. Understanding the numbers
 
+- **Everything is "used".** Dollars, percentages and requests all show how much you have spent, never how much is left. Bigger means more used.
 - **Dollars are not a bill.** They are an estimate of what the same usage would cost at the normal public prices of Anthropic's service. If you use a subscription (Pro, Max, Team), you do not pay per token, so the dollar figure is just a way to compare days and projects. If your company pays by usage, it is a good guide, but your real invoice may be a little different because of discounts and extras.
 - **Only this Mac is counted.** Using a website, a phone app or another computer does not appear in Gauge.
 - **Claude's real limit needs one click.** Claude Code knows your limit but only hands it over once you **Connect** it in Settings (see [section 6](#optional-real-claude-limits-from-claude-code)). Until then Claude shows a note about your session instead of a bar. ChatGPT is different: its real limit comes straight from Codex.

@@ -11,7 +11,7 @@ struct ProviderCard {
     let barText: String
     /// Right-hand status on the card row.
     let cardText: String
-    /// 0...1 of what is left; nil draws an empty bar.
+    /// 0...1 of what is used (the bar fills as you spend); nil draws an empty bar.
     let progress: Double?
     /// False when the bar is only a rough guide (for example Claude's session clock), so it is never drawn as a warning.
     var progressIsExact: Bool = true
