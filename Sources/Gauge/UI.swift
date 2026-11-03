@@ -130,13 +130,7 @@ final class DashboardViewController: NSViewController {
 
     func update() {
         guard isViewLoaded else { return }
-        if model.claudeSession >= 0 {
-            claudeStatus.stringValue = "\(model.claudeSession)% left"
-        } else if model.claudeWeekly >= 0 {
-            claudeStatus.stringValue = "\(model.claudeWeekly)% weekly"
-        } else {
-            claudeStatus.stringValue = "No data"
-        }
+        claudeStatus.stringValue = model.claudeCardText
 
         if let codex = model.shortestCodex {
             let remaining = "\(Int(codex.remainingPercent.rounded()))% left"
@@ -209,6 +203,7 @@ final class SettingsWindowController: NSWindowController {
     private let resetPicker = NSDatePicker()
     private let notchCheckbox = NSButton(checkboxWithTitle: "Show notch panel", target: nil, action: nil)
     private let notifyCheckbox = NSButton(checkboxWithTitle: "Notify when Codex has 20%, 10%, or 0% left", target: nil, action: nil)
+    private let claudeCodeCheckbox = NSButton(checkboxWithTitle: "Track Claude Code usage from local logs", target: nil, action: nil)
     private let loginCheckbox = NSButton(checkboxWithTitle: "Launch at Login (.app only)", target: nil, action: nil)
     private let interval = NSPopUpButton()
     private let status = makeLabel("", size: 11, color: .systemOrange)
@@ -232,8 +227,10 @@ final class SettingsWindowController: NSWindowController {
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 18),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18)
         ])
+        stack.addArrangedSubview(claudeCodeCheckbox)
+        claudeCodeCheckbox.target = self; claudeCodeCheckbox.action = #selector(toggleClaudeCode)
         stack.addArrangedSubview(makeLabel("Claude · manual subscription usage", size: 15, color: .labelColor, weight: .semibold))
-        let help = makeLabel("Copy percentages from Claude → Settings → Usage. Unknown values are not guessed.", size: 11, color: .secondaryLabelColor)
+        let help = makeLabel("Optional: copy percentages from Claude → Settings → Usage. Fresh manual values take priority over Claude Code token counts (5-hour session / 7 days).", size: 11, color: .secondaryLabelColor)
         help.maximumNumberOfLines = 2
         stack.addArrangedSubview(help)
         for pop in [session, weekly] {
@@ -279,6 +276,7 @@ final class SettingsWindowController: NSWindowController {
         session.selectItem(at: model.claudeSession + 1)
         weekly.selectItem(at: model.claudeWeekly + 1)
         resetPicker.dateValue = model.claudeReset
+        claudeCodeCheckbox.state = model.useClaudeCode ? .on : .off
         notchCheckbox.state = model.showNotch ? .on : .off
         notifyCheckbox.state = model.notify ? .on : .off
         loginCheckbox.state = model.launchAtLogin ? .on : .off
@@ -289,6 +287,7 @@ final class SettingsWindowController: NSWindowController {
     @objc private func clearClaude() { model.clearClaude(); reload() }
     @objc private func openClaude() { NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!) }
     @objc private func refresh() { model.refresh() }
+    @objc private func toggleClaudeCode() { model.useClaudeCode = claudeCodeCheckbox.state == .on }
     @objc private func toggleNotch() { model.showNotch = notchCheckbox.state == .on }
     @objc private func toggleNotify() { model.notify = notifyCheckbox.state == .on }
     @objc private func toggleLogin() { model.setLaunchAtLogin(loginCheckbox.state == .on); reload() }

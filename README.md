@@ -17,7 +17,8 @@ Then connect your AI accounts:
 | Provider | How to connect |
 |----------|----------------|
 | **ChatGPT / Codex** | Install the [Codex CLI](https://github.com/openai/codex) and run `codex login` with your ChatGPT account. Usage is then read automatically. |
-| **Claude** | Open Settings (gear icon) → **Open Claude Usage**, then copy the percentages into the app. Claude has no public usage API, so this part is manual. |
+| **Claude (Claude Code)** | Nothing to do. Gauge reads Claude Code's local logs (`~/.claude/projects`) and shows tokens used in the current 5-hour session and the last 7 days. |
+| **Claude (claude.ai)** | Optional: Settings (gear icon) → **Open Claude Usage**, then copy the percentages into the app. Fresh manual values take priority. Claude has no public usage API. |
 
 Optional in Settings: notch panel on/off, low-usage notifications (20% / 10% / 0%), auto-refresh interval, Launch at Login.
 
@@ -35,7 +36,8 @@ swift run Gauge   # run directly
 ## How it works
 
 - **ChatGPT:** talks to the local `codex app-server` over stdio and reads the Codex rate limits. These are Codex limits, not every ChatGPT chat limit. If a refresh fails, the last values stay on screen marked as stale.
-- **Claude:** shows the snapshot you entered and marks it outdated after one hour. Values are never guessed.
+- **Claude Code:** parses local transcript logs incrementally (first scan ~3 s, later refreshes milliseconds) and counts input, output and cache-creation tokens. This is token usage, not a percentage of your plan, because Anthropic does not publish subscription limits.
+- **Claude manual snapshot:** shown instead of tokens while it is less than one hour old, then marked outdated. Values are never guessed.
 - The notch panel is a visual overlay, not an Apple API. It follows the main display, and macOS fullscreen or system UI can cover it. The menu-bar popover always works.
 
 ## Limitations

@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateUI() {
-        let cl = model.claudeSession >= 0 ? "\(model.claudeSession)%" : "—"
+        let cl = model.claudeBarText
         let cg = model.shortestCodex.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "—"
         statusItem.button?.title = "✳ \(cl)  ✦ \(model.codexStale ? "~" : "")\(cg)"
         dashboard.update()
@@ -106,33 +106,79 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateBadgeText() {
-        let claude = model.claudeSession >= 0 ? "\(model.claudeSession)%" : "—"
+        let claude = model.claudeBarText
         let codex = model.shortestCodex.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "—"
         badgeLabel.stringValue = "✳  \(claude)      ✦  \(codex)"
     }
 
-    /// Resizes the panel and swaps between the compact badge and the usage card.
-    private func layoutNotch() {
-        guard let panel = notchPanel, let screen = NSScreen.main else { return }
+    private var notchGeneration = 0
+
+    private func notchFrame(expanded: Bool, screen: NSScreen) -> NSRect {
         let size = expanded
             ? NSSize(width: Layout.card.width + Self.inset * 2, height: Layout.card.height + Self.inset)
             : Self.badgeSize
         // Use the full frame (not visibleFrame) to anchor to the physical notch.
-        let frame = NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
-                           width: size.width, height: size.height)
-        panel.setFrame(frame, display: true)
+        return NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
+                      width: size.width, height: size.height)
+    }
+
+    private func showBadge(in panel: NSPanel) {
+        updateBadgeText()
+        badge.frame = NSRect(origin: .zero, size: Self.badgeSize)
+        panel.contentView = badge
+    }
+
+    /// Sets the notch panel to the current state (no animation).
+    private func layoutNotch() {
+        guard let panel = notchPanel, let screen = NSScreen.main else { return }
+        notchGeneration += 1
+        panel.setFrame(notchFrame(expanded: expanded, screen: screen), display: true)
+        if expanded { panel.contentView = makeCardHost(size: panel.frame.size) }
+        else { showBadge(in: panel) }
+    }
+
+    private func makeCardHost(size: NSSize) -> NSView {
+        let host = NSView(frame: NSRect(origin: .zero, size: size))
+        let view = notchDashboard.view
+        view.removeFromSuperview()
+        view.frame = NSRect(x: Self.inset, y: Self.inset, width: Layout.card.width, height: Layout.card.height)
+        view.autoresizingMask = [.minYMargin]   // stay pinned to the top while the panel resizes
+        host.addSubview(view)
+        host.wantsLayer = true
+        return host
+    }
+
+    /// Smoothly grows the badge into the card, or shrinks the card back into the badge.
+    private func animateNotch() {
+        guard let panel = notchPanel, let screen = NSScreen.main else { return }
+        notchGeneration += 1
+        let generation = notchGeneration
+        let target = notchFrame(expanded: expanded, screen: screen)
         if expanded {
-            let host = NSView(frame: NSRect(origin: .zero, size: size))
-            let view = notchDashboard.view
-            view.removeFromSuperview()
-            view.frame = NSRect(x: Self.inset, y: Self.inset, width: Layout.card.width, height: Layout.card.height)
-            view.autoresizingMask = []
-            host.addSubview(view)
+            let host = makeCardHost(size: panel.frame.size)
+            host.alphaValue = 0
             panel.contentView = host
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.24
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1)
+                panel.animator().setFrame(target, display: true)
+                host.animator().alphaValue = 1
+            }
         } else {
-            updateBadgeText()
-            badge.frame = NSRect(origin: .zero, size: size)
-            panel.contentView = badge
+            let host = panel.contentView
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.18
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                panel.animator().setFrame(target, display: true)
+                host?.animator().alphaValue = 0
+            }, completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, generation == self.notchGeneration, !self.expanded else { return }
+                    self.badge.alphaValue = 0
+                    self.showBadge(in: panel)
+                    NSAnimationContext.runAnimationGroup { $0.duration = 0.12; self.badge.animator().alphaValue = 1 }
+                }
+            })
         }
     }
 
@@ -149,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if hover != expanded {
             expanded = hover
             notchDashboard.update()
-            layoutNotch()
+            animateNotch()
         }
     }
 }
