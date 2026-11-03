@@ -339,6 +339,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// `Gauge --statusline` is run by Claude Code (see ClaudeLimits.swift); it must never start the app.
+if CommandLine.arguments.contains("--statusline") {
+    StatusLineBridge.run()
+    exit(0)
+}
+
 MainActor.assumeIsolated {
     let app = NSApplication.shared
     let delegate = AppDelegate()

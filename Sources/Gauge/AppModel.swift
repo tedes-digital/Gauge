@@ -21,6 +21,8 @@ final class AppModel {
     private(set) var loginError: String?
     private(set) var now = Date()
     private(set) var claudeLocal: ClaudeLocalUsage?
+    /// Real limits reported by Claude Code through its status line (see ClaudeLimits.swift).
+    private(set) var claudeLimits: ClaudeLimits?
     private(set) var codexProjects: [ProjectUsage] = []
     private(set) var codexProjectsWeek: [ProjectUsage] = []
     private(set) var codexLogsFound = false
@@ -63,10 +65,62 @@ final class AppModel {
     var launchAtLogin: Bool { SMAppService.mainApp.status == .enabled }
     var claudeStale: Bool { guard let saved = claudeSavedAt else { return true }; return now.timeIntervalSince(saved) > 3600 }
     var codexStale: Bool { error != nil || lastUpdated == nil || (lastUpdated.map { now.timeIntervalSince($0) > Double(refreshMinutes * 60 + 90) } ?? true) }
+    /// What Claude Code reports about the real limits, ready to show. Windows that already reset count as unused.
+    private struct ClaudeExact {
+        let remaining: Double          // 0...1, the tightest limit
+        let barText: String
+        let cardText: String
+        let lines: [(name: String, value: String)]
+    }
+    private var claudeExact: ClaudeExact? {
+        guard let limits = claudeLimits, now.timeIntervalSince(limits.updatedAt) < 7 * 86400 else { return nil }
+        let stale = now.timeIntervalSince(limits.updatedAt) > 90 * 60
+        let suffix = stale ? " · Stale" : ""
+        func left(_ w: ClaudeLimitWindow) -> (fraction: Double, resets: Date?) {
+            if let r = w.resetsAt, r <= now { return (1, nil) }   // window rolled over since the last report
+            return (max(0, min(1, 1 - w.usedPercent / 100)), w.resetsAt)
+        }
+        func percent(_ f: Double) -> String { "\(Int((f * 100).rounded()))%" }
+        var lines: [(name: String, value: String)] = []
+
+        if let spend = limits.spend {
+            var fraction = max(0, min(1, 1 - spend.usedPercent / 100))
+            var resets = spend.resetsAt
+            if let r = resets, r <= now { fraction = 1; resets = nil }
+            let period = spend.period.map { "\($0.capitalized) spend limit" } ?? "Spend limit"
+            let amount: String
+            if let used = spend.usedUSD, let limit = spend.limitUSD { amount = "\(money(used)) / \(money(limit))" }
+            else { amount = "\(percent(fraction)) left" }
+            lines.append((period, amount))
+            if let window = limits.fiveHour { lines.append(("5-hour limit", windowValue(window))) }
+            if let window = limits.sevenDay { lines.append(("Weekly limit", windowValue(window))) }
+            let countdown = shortCountdown(resets, now: now).map { " · \($0)" } ?? ""
+            return ClaudeExact(remaining: fraction, barText: spend.usedUSD.map(money) ?? percent(fraction),
+                               cardText: amount + countdown + suffix, lines: lines)
+        }
+        var candidates: [(label: String, fraction: Double, resets: Date?)] = []
+        if let w = limits.fiveHour { let l = left(w); candidates.append(("5-hour limit", l.fraction, l.resets)) }
+        if let w = limits.sevenDay { let l = left(w); candidates.append(("Weekly limit", l.fraction, l.resets)) }
+        guard let tightest = candidates.min(by: { $0.fraction < $1.fraction }) else { return nil }
+        lines = candidates.map { c in
+            let countdown = shortCountdown(c.resets, now: now).map { " · \($0)" } ?? ""
+            return (name: c.label, value: "\(percent(c.fraction)) left" + countdown)
+        }
+        let countdown = shortCountdown(tightest.resets, now: now).map { " · \($0)" } ?? ""
+        return ClaudeExact(remaining: tightest.fraction, barText: percent(tightest.fraction),
+                           cardText: "\(percent(tightest.fraction)) left" + countdown + suffix, lines: lines)
+    }
+    private func windowValue(_ w: ClaudeLimitWindow) -> String {
+        if let r = w.resetsAt, r <= now { return "100% left" }
+        let countdown = shortCountdown(w.resetsAt, now: now).map { " · \($0)" } ?? ""
+        return "\(Int((max(0, 100 - w.usedPercent)).rounded()))% left" + countdown
+    }
+
     private var manualClaudeFresh: Bool { claudeSession >= 0 && !claudeStale }
     /// Short text for the menu bar and notch badge.
     private func claudeAmount(tokens: Int, cost: Double) -> String { claudeUnit == "dollars" ? money(cost) : compactTokens(tokens) }
     var claudeBarText: String {
+        if let exact = claudeExact { return exact.barText }
         if manualClaudeFresh { return "\(claudeSession)%" }
         if let local = claudeLocal {
             return claudeAmount(tokens: local.sessionTokens ?? local.weeklyTokens, cost: local.sessionCost ?? local.weeklyCost)
@@ -75,6 +129,7 @@ final class AppModel {
     }
     /// 0...1 for the Claude bar: remaining % when known, otherwise the time left in the current 5-hour session.
     var claudeProgress: Double? {
+        if let exact = claudeExact { return exact.remaining }
         if manualClaudeFresh { return Double(claudeSession) / 100 }
         if let local = claudeLocal, let resets = local.sessionResetsAt { return max(0, min(1, resets.timeIntervalSince(now) / (5 * 3600))) }
         if claudeLocal != nil { return 1 }
@@ -97,8 +152,19 @@ final class AppModel {
         return rows
     }
     var claudeProjectLines: [(name: String, tokens: String)] {
-        guard let local = claudeLocal else { return [] }
-        var rows: [(name: String, tokens: String)]
+        let local = claudeLocal
+        var rows: [(name: String, tokens: String)] = []
+        if let exact = claudeExact {
+            // Real limits first, then what this Mac spent and where.
+            rows = exact.lines.map { (name: $0.name, tokens: $0.value) }
+            if let local {
+                if let tokens = local.sessionTokens { rows.append(("This session", claudeAmount(tokens: tokens, cost: local.sessionCost ?? 0))) }
+                else { rows.append(("Last 7 days", claudeAmount(tokens: local.weeklyTokens, cost: local.weeklyCost))) }
+                rows += lines(local.sessionProjects, amount: claudeAmount)
+            }
+            return rows
+        }
+        guard let local else { return [] }
         if !local.sessionProjects.isEmpty {
             rows = lines(local.sessionProjects, amount: claudeAmount)
         } else {
@@ -186,14 +252,14 @@ final class AppModel {
     /// The services shown in the card, the notch badge and the menu bar, in display order.
     /// A service is listed only once Gauge has found it on this Mac: Claude Code logs (or numbers typed in by hand),
     /// a working Codex login or Codex logs, Copilot CLI logs.
-    private var claudeDetected: Bool { (useClaudeCode && claudeLocal != nil) || claudeSession >= 0 || claudeWeekly >= 0 }
+    private var claudeDetected: Bool { claudeExact != nil || (useClaudeCode && claudeLocal != nil) || claudeSession >= 0 || claudeWeekly >= 0 }
     private var codexDetected: Bool { !windows.isEmpty || codexCredits != nil || codexLogsFound }
 
     var cards: [ProviderCard] {
         var list: [ProviderCard] = []
         if claudeDetected {
             list.append(ProviderCard(id: "claude", glyph: "✳", name: "Claude", tint: Palette.orange, barText: claudeBarText,
-                                     cardText: claudeCardText, progress: claudeProgress, progressIsExact: manualClaudeFresh,
+                                     cardText: claudeCardText, progress: claudeProgress, progressIsExact: manualClaudeFresh || claudeExact != nil,
                                      caption: claudeCaption, lines: rows(claudeProjectLines)))
         }
         if codexDetected {
@@ -207,7 +273,7 @@ final class AppModel {
     /// Text for the dashboard card.
     /// Explains what the Claude number is when there is no real remaining amount to draw as a bar.
     var claudeCaption: String? {
-        guard !manualClaudeFresh, let local = claudeLocal else { return nil }
+        guard claudeExact == nil, !manualClaudeFresh, let local = claudeLocal else { return nil }
         if local.sessionTokens != nil {
             let left = shortCountdown(local.sessionResetsAt, now: now) ?? "ending"
             return "This 5-hour session · \(left) left"
@@ -215,6 +281,7 @@ final class AppModel {
         return "No active session · last 7 days"
     }
     var claudeCardText: String {
+        if let exact = claudeExact { return exact.cardText }
         if manualClaudeFresh { return "\(claudeSession)% left" }
         if let local = claudeLocal {
             if let tokens = local.sessionTokens {
@@ -245,9 +312,11 @@ final class AppModel {
     private func changed() { onChange?() }
 
     func start() {
+        claudeLimits = ClaudeLimitsStore.read()
         tickTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.now = .now
+                self?.claudeLimits = ClaudeLimitsStore.read()
                 self?.changed()
             }
         }

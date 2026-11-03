@@ -359,6 +359,8 @@ final class SettingsWindowController: NSWindowController {
     private let notchCheckbox = NSButton(checkboxWithTitle: "Show notch panel", target: nil, action: nil)
     private let notifyCheckbox = NSButton(checkboxWithTitle: "Notify when Codex has 20%, 10%, or 0% left", target: nil, action: nil)
     private let claudeUnitPopup = NSPopUpButton()
+    private let limitsStatus = makeLabel("", size: 11, color: .secondaryLabelColor)
+    private let limitsButton = NSButton()
     private let claudeCodeCheckbox = NSButton(checkboxWithTitle: "Track Claude Code usage from local logs", target: nil, action: nil)
     private let copilotCheckbox = NSButton(checkboxWithTitle: "Track GitHub Copilot CLI requests", target: nil, action: nil)
     private let billingCheckbox = NSButton(checkboxWithTitle: "Exact total from GitHub billing (uses your gh login)", target: nil, action: nil)
@@ -370,7 +372,7 @@ final class SettingsWindowController: NSWindowController {
 
     init(model: AppModel) {
         self.model = model
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 760), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 860), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Gauge · Settings"
         window.center()
         window.isReleasedWhenClosed = false
@@ -395,6 +397,16 @@ final class SettingsWindowController: NSWindowController {
         let unitHelp = makeLabel("Dollars is what this usage would cost at public API prices. Pro, Max and Team plans are not billed per token, so treat it as the value you get, not a charge.", size: 11, color: .secondaryLabelColor)
         unitHelp.maximumNumberOfLines = 3
         stack.addArrangedSubview(unitHelp)
+        stack.addArrangedSubview(makeLabel("Claude · real limits from Claude Code", size: 15, color: .labelColor, weight: .semibold))
+        let limitsHelp = makeLabel("Claude Code can pass Gauge your real 5-hour and weekly limits (or your company's spend limit). Connecting adds one line to Claude Code's settings file; your existing status line keeps working and a backup is saved. Plans that do not report limits show nothing here.", size: 11, color: .secondaryLabelColor)
+        limitsHelp.maximumNumberOfLines = 4
+        stack.addArrangedSubview(limitsHelp)
+        limitsButton.bezelStyle = .rounded
+        limitsButton.target = self; limitsButton.action = #selector(toggleLimits)
+        let limitsRow = horizontalStack()
+        limitsRow.addArrangedSubview(limitsButton)
+        limitsRow.addArrangedSubview(limitsStatus)
+        stack.addArrangedSubview(limitsRow)
         stack.addArrangedSubview(makeLabel("Claude · manual subscription usage", size: 15, color: .labelColor, weight: .semibold))
         let help = makeLabel("Optional: copy percentages from Claude → Settings → Usage. Fresh manual values take priority over Claude Code token counts (5-hour session / 7 days).", size: 11, color: .secondaryLabelColor)
         help.maximumNumberOfLines = 2
@@ -456,10 +468,12 @@ final class SettingsWindowController: NSWindowController {
     }
     /// Lightweight update for values that change in the background (does not touch editable controls).
     func refreshStatus() {
+        updateLimitsUI()
         billingStatus.stringValue = model.billingNote ?? ""
         billingStatus.isHidden = model.billingNote == nil
     }
     func reload() {
+        updateLimitsUI()
         session.selectItem(at: model.claudeSession + 1)
         weekly.selectItem(at: model.claudeWeekly + 1)
         resetPicker.dateValue = model.claudeReset
@@ -489,6 +503,51 @@ final class SettingsWindowController: NSWindowController {
         if let value = Int(digits), value > 0 { model.copilotLimit = min(value, 1_000_000) }
         copilotLimitField.stringValue = String(model.copilotLimit)   // reject invalid input
     }
+    private func updateLimitsUI() {
+        let connected = ClaudeConnector.isConnected
+        limitsButton.title = connected ? "Disconnect" : "Connect Claude limits"
+        if !connected { limitsStatus.stringValue = "Not connected"; return }
+        if let limits = model.claudeLimits {
+            let minutes = max(0, Int(Date().timeIntervalSince(limits.updatedAt) / 60))
+            limitsStatus.stringValue = "Connected · updated " + (minutes < 1 ? "just now" : minutes < 60 ? "\(minutes) min ago" : "\(minutes / 60) h ago")
+        } else if ClaudeLimitsStore.lastHeartbeat() != nil {
+            limitsStatus.stringValue = "Connected, but Claude Code reports no limits for your plan"
+        } else {
+            limitsStatus.stringValue = "Connected · waiting for Claude Code's next reply"
+        }
+    }
+
+    @objc private func toggleLimits() {
+        func fail(_ error: Error) {
+            let alert = NSAlert()
+            alert.messageText = "Could not change Claude Code's settings"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+        if ClaudeConnector.isConnected {
+            do { try ClaudeConnector.disconnect() } catch { fail(error) }
+            updateLimitsUI()
+            return
+        }
+        let executable = Bundle.main.executablePath ?? CommandLine.arguments[0]
+        let alert = NSAlert()
+        alert.messageText = "Connect Claude limits?"
+        var text = "Gauge will add a status line entry to \(ClaudeConnector.settingsURL.path). A backup is saved next to it as settings.json.gauge-backup, and any status line you already use keeps working. You can disconnect here at any time to put everything back."
+        if !executable.contains(".app/") { text += "\n\nNote: Gauge is not running from an app bundle, so the connection would point at a temporary location. Install Gauge.app in Applications first." }
+        alert.informativeText = text
+        alert.addButton(withTitle: "Connect")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try ClaudeConnector.connect(executable: executable)
+            let done = NSAlert()
+            done.messageText = "Connected"
+            done.informativeText = "Real limits appear after Claude Code's next reply. Already-open Claude Code sessions may need a restart."
+            done.runModal()
+        } catch { fail(error) }
+        updateLimitsUI()
+    }
+
     @objc private func changeClaudeUnit() { model.claudeUnit = claudeUnitPopup.indexOfSelectedItem == 1 ? "tokens" : "dollars" }
     @objc private func toggleClaudeCode() { model.useClaudeCode = claudeCodeCheckbox.state == .on }
     @objc private func toggleNotch() { model.showNotch = notchCheckbox.state == .on }

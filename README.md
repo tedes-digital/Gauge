@@ -39,9 +39,10 @@ Short answer: **yes. Gauge keeps everything on your Mac.**
 
 **What Gauge actually does:** it reads small "history" files that your AI tools already save on your own Mac (for example, a note each time Claude Code answers you), and adds them up. It only *reads* them. It never changes or deletes them.
 
-Two optional features ask a program you already have for numbers:
+Three optional features use programs you already have:
 
 - **ChatGPT limits** come from the Codex program on your Mac. That program talks to OpenAI the way it always does. Gauge only asks it for the result.
+- **Real Claude limits** (switched off until you press **Connect**) come from Claude Code itself. Claude Code can run a small command every time it updates its status bar and hand it your limits; Gauge is that command, and it saves the numbers in one small file on your Mac. Connecting adds one line to Claude Code's settings file; you can undo it with one click. See [section 6](#optional-real-claude-limits-from-claude-code).
 - **Exact GitHub Copilot totals** (switched off by default) come from GitHub's own `gh` program, using the login you already have. Gauge never sees your password or token.
 
 The names of your project folders may appear on the card. They come from those history files and stay on your Mac.
@@ -144,7 +145,20 @@ If the tick does not stay on, add it yourself in macOS: Apple logo → **System 
 
 If you use Claude Code, Gauge shows it automatically. It adds up what you used in the current 5-hour session and in the last 7 days.
 
-You can also type in the percentages from the Claude website; see [Settings](#claude-manual-numbers).
+This gives you an estimate of what you spent (in dollars or tokens). To see your **real limit** as a percentage, connect Claude Code's limits (next part). You can also type in the percentages from the Claude website; see [Settings](#claude-manual-numbers).
+
+#### Optional: real Claude limits from Claude Code
+
+Claude does not let other programs read your limit directly, but Claude Code itself knows it and can pass it on. This works if you have a **Claude Pro, Max or Ultra** subscription, or if your company runs Claude Code behind a gateway with a **spend limit** (then you also see your spend and budget in dollars).
+
+1. Open Gauge's **Settings** (gear on the card).
+2. Under **Claude · real limits from Claude Code**, click **Connect Claude limits**.
+3. Gauge explains what it will change. Click **Connect**.
+4. Use Claude Code as usual. After its next reply, the Claude row shows your real percentage left and when it resets. Claude Code sessions that were already open may need a restart.
+
+What this does: it adds one entry called `statusLine` to Claude Code's settings file (`~/.claude/settings.json`). Gauge saves a backup copy next to it first (`settings.json.gauge-backup`). If you already have your own status line, it keeps working: Gauge passes the information on to it. Click **Disconnect** in the same place to put everything back exactly as it was.
+
+If you move Gauge out of the Applications folder, click Disconnect and then Connect again. Plans that do not report limits (for example pay-per-use API keys) show nothing extra here, and Settings tells you so.
 
 ### ChatGPT (Codex): one-time setup
 
@@ -196,7 +210,7 @@ The card has one row per tool. Each row has:
 - **The tool's logo and name** (Claude, ChatGPT, Copilot).
 - **A number on the right**, for example `$10.8` or `79% left`.
 - **A coloured bar** underneath that shows how much is left. It turns **red** when little is left.
-- For Claude, if you have not typed in percentages, a **short note** instead of a bar, saying what the number is (see below). Claude does not publish how much of your limit is left, so there is nothing real to draw as a bar.
+- For Claude, if you have neither connected the limits nor typed in percentages, a **short note** instead of a bar, saying what the number is (see below). Without your real limit there is nothing true to draw as a bar.
 
 What the text means for each tool:
 
@@ -204,6 +218,7 @@ What the text means for each tool:
 |------|------|---------|
 | **Claude** | `$10.8` and the note *This 5-hour session · 1h 18m left* | What this 5-hour session cost at normal public prices, and how long until the session ends. In tokens mode, it shows a token count instead of dollars. |
 | **Claude** (idle) | `$270` and the note *No active session · last 7 days* | No session is running. This is the total for the last 7 days. |
+| **Claude** (limits connected) | `29% left · 1h 14m` and a bar | Your real limit: how much is left in the tightest window (5-hour or weekly) and when it resets. With a company spend limit it reads like `$314 / $500 · 12d`. If Claude Code has not reported for a while it says *Stale*. |
 | **Claude** (with percentages typed in) | `62% left` and a bar | The percentage you copied from the Claude website. |
 | **ChatGPT** | `79% left · 3d 4h` | How much of your limit is left, and when it resets. |
 | **Copilot** | `12 / 300 req` | Requests used this month out of your monthly allowance. |
@@ -225,11 +240,17 @@ Open Settings with the **gear** on the card, or right-click the menu-bar icon �
 | **Track Claude Code usage from local logs** | On: Gauge reads Claude Code's history on your Mac and shows your usage. Off: Gauge stops reading it. |
 | **Claude Code shows** | Choose **Dollars (API list prices)** or **Tokens**. Dollars shows what your usage would cost at Anthropic's public prices. Tokens shows the raw amount of text processed. Plans like Pro, Max and Team are not billed per token, so for them dollars is a guide to the value you get, not a charge. |
 
+### Claude real limits
+
+| Setting | What it does |
+|---------|--------------|
+| **Connect Claude limits / Disconnect** | Connect: lets Claude Code pass Gauge your real limits (see [section 6](#optional-real-claude-limits-from-claude-code)). Disconnect: removes the entry and restores your previous settings. The line next to the button tells you whether it is connected and when numbers last arrived. |
+
 ### Claude manual numbers
 
 <a id="claude-manual-numbers"></a>
 
-Optional. Claude's website shows your real limit as percentages, but programs cannot read them. If you want them in Gauge, copy them by hand. A recent manual value (less than an hour old) is shown instead of the dollars or tokens.
+Optional, and only needed if you do not connect the real limits above. Claude's website shows your limit as percentages; copy them by hand if you want them in Gauge. A recent manual value (less than an hour old) is shown instead of the dollars or tokens.
 
 | Setting | What it does |
 |---------|--------------|
@@ -269,7 +290,7 @@ Optional. Claude's website shows your real limit as percentages, but programs ca
 
 - **Dollars are not a bill.** They are an estimate of what the same usage would cost at the normal public prices of Anthropic's service. If you use a subscription (Pro, Max, Team), you do not pay per token, so the dollar figure is just a way to compare days and projects. If your company pays by usage, it is a good guide, but your real invoice may be a little different because of discounts and extras.
 - **Only this Mac is counted.** Using a website, a phone app or another computer does not appear in Gauge.
-- **Limits are not published.** Claude does not tell programs how much of your limit is left, which is why Claude shows a note about your session (instead of a bar) unless you type in the percentages. ChatGPT is different: its real limit comes straight from Codex.
+- **Claude's real limit needs one click.** Claude Code knows your limit but only hands it over once you **Connect** it in Settings (see [section 6](#optional-real-claude-limits-from-claude-code)). Until then Claude shows a note about your session instead of a bar. ChatGPT is different: its real limit comes straight from Codex.
 - **Copilot is an estimate** unless you turn on the exact total. GitHub's own billing page is always the final word.
 
 ---
@@ -297,6 +318,9 @@ It appears only after the Copilot command-line tool has been used on this Mac. I
 **The numbers are different from the website.**
 Gauge counts only this Mac, and Claude and Copilot numbers are estimates (see [section 9](#9-understanding-the-numbers)).
 
+**Claude shows a note instead of a bar, or says `Stale`.**
+The real limit appears after you click **Connect Claude limits** and Claude Code replies once. It says *Stale* when Claude Code has not reported for a while (for example if you only use Claude on the website). Numbers refresh every few minutes; click ⟳ to refresh now.
+
 **Claude shows `Idle` or an old number.**
 Numbers refresh every few minutes. Click ⟳ on the card to refresh now.
 
@@ -311,11 +335,12 @@ Make sure Gauge is in the **Applications** folder, then switch the setting off a
 
 **Uninstall:**
 
-1. Quit Gauge (above).
-2. Open **Applications** and drag **Gauge** to the **Trash**.
-3. If you switched on Launch at Login, also remove Gauge from **System Settings → General → Login Items**.
+1. If you connected Claude limits, open Settings and click **Disconnect** first.
+2. Quit Gauge (above).
+3. Open **Applications** and drag **Gauge** to the **Trash**.
+4. If you switched on Launch at Login, also remove Gauge from **System Settings → General → Login Items**.
 
-Gauge saves only your settings, in one small file on your Mac. Nothing else is left behind, and Gauge never changed your AI tools' files.
+Gauge saves only your settings, plus the latest Claude limits if you connected them, in small files on your Mac (`~/Library/Preferences` and `~/Library/Application Support/Gauge`). Nothing else is left behind, and Gauge never changed your AI tools' files.
 
 ---
 
@@ -334,7 +359,7 @@ swift run Gauge        # run directly
 
 | Service | Source |
 |---------|--------|
-| Claude Code | local logs in `~/.claude/projects`, priced with Anthropic's public list prices |
+| Claude Code | local logs in `~/.claude/projects`, priced with Anthropic's public list prices; real limits through Claude Code's status line (`Gauge --statusline` reads `rate_limits` from stdin and saves it) |
 | ChatGPT / Codex | `codex app-server` over local stdio for limits; `~/.codex/sessions` for per-project tokens |
 | GitHub Copilot | `~/.copilot/session-state`; optionally `gh api` for billing |
 
