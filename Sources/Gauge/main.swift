@@ -29,8 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
-        statusItem.button?.action = #selector(toggleMenu)
-        statusItem.button?.toolTip = "Gauge · click to open"
+        statusItem.button?.action = #selector(statusItemClicked)
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        statusItem.button?.toolTip = "Gauge · click to open · right-click for menu"
         model.onChange = { [weak self] in self?.updateUI() }
         lastNotchEnabled = model.showNotch
         if model.showNotch { buildNotch() }
@@ -45,7 +46,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
     }
 
-    @objc private func toggleMenu() {
+    @objc private func statusItemClicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            let menu = NSMenu()
+            menu.addItem(withTitle: "Refresh", action: #selector(refreshNow), keyEquivalent: "r").target = self
+            menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Quit Gauge", action: #selector(quit), keyEquivalent: "q").target = self
+            statusItem.menu = menu
+            statusItem.button?.performClick(nil)
+            statusItem.menu = nil   // keep left-click opening the popover
+        } else {
+            toggleMenu()
+        }
+    }
+    @objc private func refreshNow() { model.refresh() }
+    @objc private func openSettings() { showSettings() }
+    @objc private func quit() { NSApp.terminate(nil) }
+
+    private func toggleMenu() {
         guard let button = statusItem.button else { return }
         if popover.isShown { popover.performClose(nil) }
         else {

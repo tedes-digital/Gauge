@@ -87,6 +87,7 @@ final class DashboardViewController: NSViewController {
         heading.addArrangedSubview(headingSpacer)
         let settingsButton = iconButton("gearshape", label: "Settings", action: #selector(settings))
         heading.addArrangedSubview(settingsButton)
+        heading.addArrangedSubview(iconButton("power", label: "Quit Gauge", action: #selector(quit)))
         heading.heightAnchor.constraint(equalToConstant: 28).isActive = true
         stack.addArrangedSubview(heading)
         stack.setCustomSpacing(6, after: heading)
@@ -191,6 +192,7 @@ final class DashboardViewController: NSViewController {
     }
 
     @objc private func refresh() { model.refresh() }
+    @objc private func quit() { NSApp.terminate(nil) }
     @objc private func settings() { AppDelegate.instance?.showSettings() }
 }
 
