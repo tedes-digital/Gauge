@@ -184,7 +184,8 @@ final class AppModel {
     var cards: [ProviderCard] {
         var list = [
             ProviderCard(id: "claude", glyph: "✳", name: "Claude", tint: Palette.orange, barText: claudeBarText,
-                         cardText: claudeCardText, progress: claudeProgress, lines: rows(claudeProjectLines)),
+                         cardText: claudeCardText, progress: claudeProgress, progressIsExact: manualClaudeFresh,
+                         lines: rows(claudeProjectLines)),
             ProviderCard(id: "codex", glyph: "✦", name: "ChatGPT", tint: Palette.blue, barText: codexBarText,
                          cardText: codexCardText, progress: codexProgress,
                          lines: codexWindowLines + rows(codexProjectLines))

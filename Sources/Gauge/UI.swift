@@ -7,6 +7,8 @@ final class ProgressBar: NSView {
     private let fill = CALayer()
     private let tint: NSColor
     var progress: Double? { didSet { needsLayout = true } }
+    /// Inexact bars (a time guide, not a real remaining amount) stay grey and never turn red.
+    var isExact = true { didSet { needsLayout = true } }
 
     init(tint: NSColor) {
         self.tint = tint
@@ -26,7 +28,8 @@ final class ProgressBar: NSView {
         CATransaction.setAnimationDuration(0.25)
         fill.frame = CGRect(x: 0, y: 0, width: bounds.width * value, height: bounds.height)
         // Turn red when little is left.
-        fill.backgroundColor = (progress.map { $0 <= 0.15 } ?? false ? NSColor.systemRed : tint).cgColor
+        let low = isExact && (progress.map { $0 <= 0.15 } ?? false)
+        fill.backgroundColor = (low ? NSColor.systemRed : (isExact ? tint : NSColor(calibratedWhite: 0.5, alpha: 1))).cgColor
         CATransaction.commit()
     }
 }
@@ -240,6 +243,7 @@ final class DashboardViewController: NSViewController {
         for (row, card) in zip(rows, cards) {
             row.name.attributedStringValue = ProviderIcons.label(card, text: card.name, font: row.name.font ?? .systemFont(ofSize: 15), color: card.tint)
             row.status.stringValue = card.cardText
+            row.bar.isExact = card.progressIsExact
             row.bar.progress = card.progress
         }
 

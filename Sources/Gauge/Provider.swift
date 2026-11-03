@@ -13,6 +13,8 @@ struct ProviderCard {
     let cardText: String
     /// 0...1 of what is left; nil draws an empty bar.
     let progress: Double?
+    /// False when the bar is only a rough guide (for example Claude's session clock), so it is never drawn as a warning.
+    var progressIsExact: Bool = true
     /// Rows for the hover breakdown (name, value).
     let lines: [(name: String, value: String)]
 }
