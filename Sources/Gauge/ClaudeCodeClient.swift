@@ -1,11 +1,23 @@
 import Foundation
 
+struct ProjectUsage: Equatable {
+    let name: String
+    let tokens: Int
+    /// API-equivalent USD (Claude only; 0 for services without prices).
+    var cost: Double = 0
+}
+
 struct ClaudeLocalUsage: Equatable {
+    /// Per-project tokens in the current session, largest first.
+    let sessionProjects: [ProjectUsage]
     /// Tokens used in the current 5-hour session block (nil when no block is active).
     let sessionTokens: Int?
     let sessionResetsAt: Date?
     /// Tokens used in the last 7 days.
     let weeklyTokens: Int
+    /// API-equivalent USD for the current session / last 7 days (see `ClaudePricing`).
+    let sessionCost: Double?
+    let weeklyCost: Double
 }
 
 /// Estimates Claude Code usage from its local transcript logs (`~/.claude/projects/**/*.jsonl`).
@@ -15,7 +27,7 @@ struct ClaudeLocalUsage: Equatable {
 /// Incremental: remembers how far each file was read, so refreshes only parse newly appended lines.
 /// Not thread-safe; call from one queue at a time.
 final class ClaudeCodeClient: @unchecked Sendable {
-    private struct Record { var date: Date; var tokens: Int }
+    private struct Record { var date: Date; var tokens: Int; var cost: Double; var project: String }
 
     private static let sessionLength: TimeInterval = 5 * 3600
     private static let weekLength: TimeInterval = 7 * 86400
@@ -52,22 +64,33 @@ final class ClaudeCodeClient: @unchecked Sendable {
         // Sessions: a block starts at the first message and lasts 5 hours; the next message after that starts a new one.
         var blockStart: Date?
         var blockTokens = 0
+        var blockCost = 0.0
+        var blockRecords: [Record] = []
         for record in sorted {
             if let start = blockStart, record.date < start.addingTimeInterval(Self.sessionLength) {
                 blockTokens += record.tokens
+                blockCost += record.cost
+                blockRecords.append(record)
             } else {
                 blockStart = record.date
                 blockTokens = record.tokens
+                blockCost = record.cost
+                blockRecords = [record]
             }
         }
         var session: Int?
         var resets: Date?
+        var projects: [ProjectUsage] = []
         if let start = blockStart, start.addingTimeInterval(Self.sessionLength) > now {
             session = blockTokens
             resets = start.addingTimeInterval(Self.sessionLength)
+            let grouped = Dictionary(grouping: blockRecords, by: \.project).map { ProjectUsage(name: $0.key, tokens: $0.value.reduce(0) { $0 + $1.tokens },
+                                                                                        cost: $0.value.reduce(0) { $0 + $1.cost }) }
+            projects = grouped.sorted { $0.tokens > $1.tokens }
         }
-        return ClaudeLocalUsage(sessionTokens: session, sessionResetsAt: resets,
-                                weeklyTokens: sorted.reduce(0) { $0 + $1.tokens })
+        return ClaudeLocalUsage(sessionProjects: projects, sessionTokens: session, sessionResetsAt: resets,
+                                weeklyTokens: sorted.reduce(0) { $0 + $1.tokens },
+                                sessionCost: session == nil ? nil : blockCost, weeklyCost: sorted.reduce(0) { $0 + $1.cost })
     }
 
     private func scan(_ root: URL, cutoff: Date) {
@@ -118,10 +141,17 @@ final class ClaudeCodeClient: @unchecked Sendable {
               date >= cutoff else { return }
         func value(_ key: String) -> Int { (usage[key] as? NSNumber)?.intValue ?? 0 }
         let tokens = value("input_tokens") + value("output_tokens") + value("cache_creation_input_tokens")
+        let breakdown = usage["cache_creation"] as? [String: Any]
+        let write5m = (breakdown?["ephemeral_5m_input_tokens"] as? NSNumber)?.intValue
+        let write1h = (breakdown?["ephemeral_1h_input_tokens"] as? NSNumber)?.intValue ?? 0
+        let cost = ClaudePricing.cost(model: (message["model"] as? String) ?? "", input: value("input_tokens"),
+                                      output: value("output_tokens"), cacheRead: value("cache_read_input_tokens"),
+                                      cacheWrite5m: breakdown == nil ? value("cache_creation_input_tokens") : (write5m ?? 0), cacheWrite1h: write1h)
         // A streamed message is logged several times with growing usage; keep the largest per message.
         let id = (message["id"] as? String) ?? (object["uuid"] as? String) ?? stamp
-        if let existing = records[id], existing.tokens >= tokens { return }
-        records[id] = Record(date: date, tokens: tokens)
+        if let existing = records[id], existing.tokens >= tokens, existing.cost >= cost { return }
+        let project = (object["cwd"] as? String).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Unknown"
+        records[id] = Record(date: date, tokens: tokens, cost: cost, project: project.isEmpty ? "/" : project)
     }
 }
 

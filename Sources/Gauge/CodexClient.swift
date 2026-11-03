@@ -10,6 +10,21 @@ struct UsageWindow: Identifiable, Equatable {
     var remainingPercent: Double { max(0, min(100, 100 - usedPercent)) }
 }
 
+struct CodexCredits: Equatable {
+    let hasCredits: Bool
+    let unlimited: Bool
+    let balance: String?
+}
+
+/// What Codex reports for the signed-in account. Percent windows exist for ChatGPT subscriptions; admin-managed or
+/// credit-based plans may report none, only credits.
+struct CodexLimits {
+    let windows: [UsageWindow]
+    let planType: String?
+    let credits: CodexCredits?
+    let spendControlReached: Bool
+}
+
 enum CodexClientError: LocalizedError {
     case notInstalled
     case timedOut
@@ -27,7 +42,7 @@ enum CodexClientError: LocalizedError {
 
 /// Uses the documented Codex App Server over local stdio. Never reads browser cookies or tokens.
 struct CodexClient {
-    func fetch() throws -> [UsageWindow] {
+    func fetch() throws -> CodexLimits {
         let proc = Process()
         let input = Pipe()
         let output = Pipe()
@@ -68,7 +83,7 @@ struct CodexClient {
             input.fileHandleForWriting.write(payload + Data([10]))
         }
         try send(["id": 1, "method": "initialize", "params": [
-            "clientInfo": ["name": "gauge", "title": "Gauge", "version": "0.1.0"],
+            "clientInfo": ["name": "gauge", "title": "Gauge", "version": "0.3.0"],
             "capabilities": [:] as [String: String]
         ]])
         let initialized = try collector.wait(for: 1, timeout: 8)
@@ -106,8 +121,17 @@ struct CodexClient {
                 ))
             }
         }
-        if windows.isEmpty { throw CodexClientError.server("No Codex subscription limits returned. Sign in to Codex with ChatGPT (not an API key).") }
-        return windows
+        let main = (result["rateLimits"] as? [String: Any]) ?? buckets.first?.1
+        let credits = (main?["credits"] as? [String: Any]).map {
+            CodexCredits(hasCredits: ($0["hasCredits"] as? Bool) ?? false, unlimited: ($0["unlimited"] as? Bool) ?? false,
+                         balance: $0["balance"] as? String)
+        }
+        let hasCreditInfo = credits.map { $0.unlimited || $0.hasCredits } ?? false
+        if windows.isEmpty && !hasCreditInfo {
+            throw CodexClientError.server("No ChatGPT-managed Codex limits for this account. It may use an API key or admin-managed limits; sign in to Codex with ChatGPT to see usage here.")
+        }
+        return CodexLimits(windows: windows, planType: main?["planType"] as? String, credits: credits,
+                           spendControlReached: (main?["spendControlReached"] as? Bool) ?? false)
     }
 }
 
