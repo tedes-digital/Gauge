@@ -310,6 +310,8 @@ final class DashboardViewController: NSViewController {
         caption.maximumNumberOfLines = 1
         caption.isHidden = true
         status.alignment = .right
+        status.maximumNumberOfLines = 1
+        name.maximumNumberOfLines = 1
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         for sub in [name, status, bar, caption] { row.addSubview(sub); sub.translatesAutoresizingMaskIntoConstraints = false }
         NSLayoutConstraint.activate([
@@ -349,128 +351,215 @@ final class DashboardViewController: NSViewController {
 }
 
 @MainActor
-final class SettingsWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController, NSTabViewDelegate {
     private static let copilotLimits = [50, 300, 1000, 1500, 3000]
+    private static let windowWidth: CGFloat = 460
+    private static let contentWidth: CGFloat = 396   // width of every block, so help text wraps predictably
     private let model: AppModel
-    private let stack = verticalStack(spacing: 13)
+    private let tabView = NSTabView()
+    private var tabStacks: [NSStackView] = []
+
+    // Claude
+    private let claudeCodeCheckbox = NSButton(checkboxWithTitle: "Track Claude Code usage on this Mac", target: nil, action: nil)
+    private let claudeUnitPopup = NSPopUpButton()
+    private let limitsStatus = SettingsWindowController.helpLabel("")
+    private let limitsButton = NSButton()
+    private let manualToggle = NSButton()
+    private let manualBody = NSStackView()
     private let session = NSPopUpButton()
     private let weekly = NSPopUpButton()
     private let resetPicker = NSDatePicker()
-    private let notchCheckbox = NSButton(checkboxWithTitle: "Show notch panel", target: nil, action: nil)
-    private let notifyCheckbox = NSButton(checkboxWithTitle: "Notify when Codex has 20%, 10%, or 0% left", target: nil, action: nil)
-    private let claudeUnitPopup = NSPopUpButton()
-    private let limitsStatus = makeLabel("", size: 11, color: .secondaryLabelColor)
-    private let limitsButton = NSButton()
-    private let claudeCodeCheckbox = NSButton(checkboxWithTitle: "Track Claude Code usage from local logs", target: nil, action: nil)
-    private let copilotCheckbox = NSButton(checkboxWithTitle: "Track GitHub Copilot CLI requests", target: nil, action: nil)
-    private let billingCheckbox = NSButton(checkboxWithTitle: "Exact total from GitHub billing (uses your gh login)", target: nil, action: nil)
-    private let billingStatus = makeLabel("", size: 11, color: .systemOrange)
+    // ChatGPT
+    private let notifyCheckbox = NSButton(checkboxWithTitle: "Notify me when my limit is almost used up", target: nil, action: nil)
+    // Copilot
+    private let copilotCheckbox = NSButton(checkboxWithTitle: "Count my Copilot CLI requests", target: nil, action: nil)
     private let copilotLimitField = NSComboBox()
-    private let loginCheckbox = NSButton(checkboxWithTitle: "Launch at Login (.app only)", target: nil, action: nil)
+    private let billingCheckbox = NSButton(checkboxWithTitle: "Use GitHub billing for the exact total", target: nil, action: nil)
+    private let billingStatus = SettingsWindowController.helpLabel("")
+    // General
+    private let notchCheckbox = NSButton(checkboxWithTitle: "Show Gauge next to the notch", target: nil, action: nil)
+    private let loginCheckbox = NSButton(checkboxWithTitle: "Open Gauge when I log in", target: nil, action: nil)
     private let interval = NSPopUpButton()
-    private let status = makeLabel("", size: 11, color: .systemOrange)
+    private let status = SettingsWindowController.helpLabel("")
 
     init(model: AppModel) {
         self.model = model
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 860), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        window.title = "Gauge · Settings"
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: Self.windowWidth, height: 420),
+                              styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        window.title = "Gauge Settings"
         window.center()
         window.isReleasedWhenClosed = false
         super.init(window: window)
         build()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
-    private func build() {
-        guard let content = window?.contentView else { return }
-        content.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 18),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18)
-        ])
-        stack.addArrangedSubview(claudeCodeCheckbox)
-        claudeCodeCheckbox.target = self; claudeCodeCheckbox.action = #selector(toggleClaudeCode)
-        claudeUnitPopup.addItems(withTitles: ["Dollars (API list prices)", "Tokens"])
-        claudeUnitPopup.target = self; claudeUnitPopup.action = #selector(changeClaudeUnit)
-        stack.addArrangedSubview(settingsRow("Claude Code shows", control: claudeUnitPopup))
-        let unitHelp = makeLabel("Dollars is what this usage would cost at public API prices. Pro, Max and Team plans are not billed per token, so treat it as the value you get, not a charge.", size: 11, color: .secondaryLabelColor)
-        unitHelp.maximumNumberOfLines = 3
-        stack.addArrangedSubview(unitHelp)
-        stack.addArrangedSubview(makeLabel("Claude · real limits from Claude Code", size: 15, color: .labelColor, weight: .semibold))
-        let limitsHelp = makeLabel("Claude Code can pass Gauge your real 5-hour and weekly limits (or your company's spend limit). Connecting adds one line to Claude Code's settings file; your existing status line keeps working and a backup is saved. Plans that do not report limits show nothing here.", size: 11, color: .secondaryLabelColor)
-        limitsHelp.maximumNumberOfLines = 4
-        stack.addArrangedSubview(limitsHelp)
-        limitsButton.bezelStyle = .rounded
-        limitsButton.target = self; limitsButton.action = #selector(toggleLimits)
-        let limitsRow = horizontalStack()
-        limitsRow.addArrangedSubview(limitsButton)
-        limitsRow.addArrangedSubview(limitsStatus)
-        stack.addArrangedSubview(limitsRow)
-        stack.addArrangedSubview(makeLabel("Claude · manual subscription usage", size: 15, color: .labelColor, weight: .semibold))
-        let help = makeLabel("Optional: copy percentages from Claude → Settings → Usage. Fresh manual values take priority over Claude Code token counts (5-hour session / 7 days).", size: 11, color: .secondaryLabelColor)
-        help.maximumNumberOfLines = 2
-        stack.addArrangedSubview(help)
-        for pop in [session, weekly] {
-            pop.addItem(withTitle: "Unknown")
-            for value in 0...100 { pop.addItem(withTitle: "\(value)%") }
-        }
-        stack.addArrangedSubview(settingsRow("5-hour remaining", control: session))
-        stack.addArrangedSubview(settingsRow("Weekly remaining", control: weekly))
-        resetPicker.datePickerStyle = .textFieldAndStepper
-        resetPicker.datePickerElements = [.yearMonthDay, .hourMinute]
-        stack.addArrangedSubview(settingsRow("Session reset", control: resetPicker))
-        let claudeButtons = horizontalStack()
-        claudeButtons.addArrangedSubview(actionButton("Save snapshot", target: self, action: #selector(saveClaude)))
-        claudeButtons.addArrangedSubview(actionButton("Clear", target: self, action: #selector(clearClaude)))
-        claudeButtons.addArrangedSubview(actionButton("Open Claude Usage", target: self, action: #selector(openClaude)))
-        stack.addArrangedSubview(claudeButtons)
-        stack.addArrangedSubview(makeLabel("ChatGPT · Codex subscription", size: 15, color: .labelColor, weight: .semibold))
-        let codexHelp = makeLabel("Uses Codex CLI App Server. Codex quotas are NOT all ChatGPT chat limits.", size: 11, color: .secondaryLabelColor)
-        codexHelp.maximumNumberOfLines = 2
-        stack.addArrangedSubview(codexHelp)
-        stack.addArrangedSubview(actionButton("Refresh Codex now", target: self, action: #selector(refresh)))
-        stack.addArrangedSubview(makeLabel("GitHub Copilot", size: 15, color: .labelColor, weight: .semibold))
-        let copilotHelp = makeLabel("Counts your prompts from Copilot CLI logs on this Mac per calendar month (UTC). Chat in VS Code, GitHub.com and mobile is not included. Allowance: Free 50, Pro/Business 300, Enterprise 1000, Pro+ 1500, or type your own. An estimate; GitHub billing is authoritative.", size: 11, color: .secondaryLabelColor)
-        copilotHelp.maximumNumberOfLines = 4
-        stack.addArrangedSubview(copilotHelp)
-        stack.addArrangedSubview(copilotCheckbox)
-        copilotCheckbox.target = self; copilotCheckbox.action = #selector(toggleCopilot)
-        stack.addArrangedSubview(billingCheckbox)
-        billingCheckbox.target = self; billingCheckbox.action = #selector(toggleBilling)
-        billingStatus.maximumNumberOfLines = 3
-        stack.addArrangedSubview(billingStatus)
-        copilotLimitField.addItems(withObjectValues: Self.copilotLimits.map { String($0) })
-        copilotLimitField.numberOfVisibleItems = 6
-        copilotLimitField.widthAnchor.constraint(equalToConstant: 110).isActive = true
-        copilotLimitField.target = self; copilotLimitField.action = #selector(changeCopilotLimit)
-        let allowance = settingsRow("Monthly requests", control: copilotLimitField)
-        stack.addArrangedSubview(allowance)
-        stack.addArrangedSubview(makeLabel("App behavior", size: 15, color: .labelColor, weight: .semibold))
-        for box in [notchCheckbox, notifyCheckbox, loginCheckbox] { stack.addArrangedSubview(box) }
-        notchCheckbox.target = self; notchCheckbox.action = #selector(toggleNotch)
-        notifyCheckbox.target = self; notifyCheckbox.action = #selector(toggleNotify)
-        loginCheckbox.target = self; loginCheckbox.action = #selector(toggleLogin)
-        for n in [1, 5, 10, 15] { interval.addItem(withTitle: "\(n) min") }
-        interval.target = self; interval.action = #selector(changeInterval)
-        stack.addArrangedSubview(settingsRow("Auto-refresh", control: interval))
-        status.maximumNumberOfLines = 2
-        stack.addArrangedSubview(status)
-        reload()
+
+    // MARK: Building blocks (one look for every setting)
+
+    private static func helpLabel(_ text: String) -> NSTextField {
+        let label = makeLabel(text, size: 11, color: .secondaryLabelColor)
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        label.preferredMaxLayoutWidth = contentWidth
+        return label
+    }
+    private func help(_ text: String) -> NSTextField { Self.helpLabel(text) }
+    private func groupTitle(_ text: String) -> NSTextField {
+        makeLabel(text, size: 13, color: .labelColor, weight: .semibold)
+    }
+    /// A titled block: title, then controls, then optional help text.
+    private func group(_ title: String, _ views: [NSView]) -> NSStackView {
+        let block = verticalStack(spacing: 8)
+        block.addArrangedSubview(groupTitle(title))
+        views.forEach { block.addArrangedSubview($0) }
+        return block
     }
     private func settingsRow(_ title: String, control: NSView) -> NSView {
         let row = horizontalStack()
-        let label = makeLabel(title, size: 12, color: .labelColor)
-        label.widthAnchor.constraint(equalToConstant: 155).isActive = true
+        let label = makeLabel(title, size: 13, color: .labelColor)
+        label.widthAnchor.constraint(equalToConstant: 130).isActive = true
         row.addArrangedSubview(label)
         row.addArrangedSubview(control)
         return row
     }
+    private func addTab(_ title: String, _ groups: [NSView]) {
+        let item = NSTabViewItem(identifier: title)
+        item.label = title
+        let container = NSView()
+        let stack = verticalStack(spacing: 22)
+        groups.forEach { stack.addArrangedSubview($0) }
+        container.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 18),
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
+            stack.widthAnchor.constraint(equalToConstant: Self.contentWidth)
+        ])
+        item.view = container
+        tabView.addTabViewItem(item)
+        tabStacks.append(stack)
+    }
+
+    // MARK: Layout
+
+    private func build() {
+        guard let content = window?.contentView else { return }
+        tabView.frame = content.bounds
+        tabView.autoresizingMask = [.width, .height]
+        tabView.delegate = self
+        content.addSubview(tabView)
+
+        claudeCodeCheckbox.target = self; claudeCodeCheckbox.action = #selector(toggleClaudeCode)
+        claudeUnitPopup.addItems(withTitles: ["Dollars (at API prices)", "Tokens"])
+        claudeUnitPopup.target = self; claudeUnitPopup.action = #selector(changeClaudeUnit)
+        limitsButton.bezelStyle = .rounded
+        limitsButton.target = self; limitsButton.action = #selector(toggleLimits)
+        limitsStatus.maximumNumberOfLines = 0
+        limitsStatus.preferredMaxLayoutWidth = 230   // sits beside the button
+        billingStatus.textColor = .systemOrange
+        for pop in [session, weekly] {
+            pop.addItem(withTitle: "Unknown")
+            for value in 0...100 { pop.addItem(withTitle: "\(value)%") }
+        }
+        resetPicker.datePickerStyle = .textFieldAndStepper
+        resetPicker.datePickerElements = [.yearMonthDay, .hourMinute]
+        notifyCheckbox.target = self; notifyCheckbox.action = #selector(toggleNotify)
+        copilotCheckbox.target = self; copilotCheckbox.action = #selector(toggleCopilot)
+        billingCheckbox.target = self; billingCheckbox.action = #selector(toggleBilling)
+        copilotLimitField.addItems(withObjectValues: Self.copilotLimits.map { String($0) })
+        copilotLimitField.numberOfVisibleItems = 6
+        copilotLimitField.widthAnchor.constraint(equalToConstant: 110).isActive = true
+        copilotLimitField.target = self; copilotLimitField.action = #selector(changeCopilotLimit)
+        notchCheckbox.target = self; notchCheckbox.action = #selector(toggleNotch)
+        loginCheckbox.target = self; loginCheckbox.action = #selector(toggleLogin)
+        for n in [1, 5, 10, 15] { interval.addItem(withTitle: "Every \(n) min") }
+        interval.target = self; interval.action = #selector(changeInterval)
+
+        // Claude
+        let limitsRow = horizontalStack()
+        limitsRow.addArrangedSubview(limitsButton)
+        limitsRow.addArrangedSubview(limitsStatus)
+        manualToggle.setButtonType(.pushOnPushOff)
+        manualToggle.bezelStyle = .disclosure
+        manualToggle.title = ""
+        manualToggle.target = self; manualToggle.action = #selector(toggleManual)
+        let manualHeader = horizontalStack(spacing: 6)
+        manualHeader.addArrangedSubview(manualToggle)
+        manualHeader.addArrangedSubview(groupTitle("Enter percentages by hand"))
+        manualBody.orientation = .vertical
+        manualBody.alignment = .leading
+        manualBody.spacing = 8
+        manualBody.translatesAutoresizingMaskIntoConstraints = false
+        let manualButtons = horizontalStack()
+        manualButtons.addArrangedSubview(actionButton("Save", target: self, action: #selector(saveClaude)))
+        manualButtons.addArrangedSubview(actionButton("Clear", target: self, action: #selector(clearClaude)))
+        manualButtons.addArrangedSubview(actionButton("Open Claude usage page", target: self, action: #selector(openClaude)))
+        [help("Only needed if you do not connect real limits above. Copy the percentages from claude.ai → Settings → Usage. A value saved less than an hour ago is shown instead of dollars or tokens."),
+         settingsRow("5-hour window left", control: session), settingsRow("Weekly limit left", control: weekly),
+         settingsRow("Window resets at", control: resetPicker), manualButtons].forEach { manualBody.addArrangedSubview($0) }
+        let manualBlock = verticalStack(spacing: 8)
+        manualBlock.addArrangedSubview(manualHeader)
+        manualBlock.addArrangedSubview(manualBody)
+        let hasManual = model.claudeSession >= 0 || model.claudeWeekly >= 0
+        manualToggle.state = hasManual ? .on : .off
+        manualBody.isHidden = !hasManual
+
+        addTab("Claude", [
+            group("Usage on this Mac", [claudeCodeCheckbox, settingsRow("Show as", control: claudeUnitPopup),
+                help("Dollars is what this usage would cost at public API prices. On Pro, Max and Team plans you are not billed per token, so it shows the value you get, not a charge.")]),
+            group("Real limits from Claude Code", [
+                help("Claude Code can tell Gauge your real 5-hour and weekly limits (or your company's spend limit). Connecting adds one line to Claude Code's settings after you confirm, keeps a backup, and keeps any status line you already use."),
+                limitsRow]),
+            manualBlock
+        ])
+        addTab("ChatGPT", [
+            group("Limits", [help("Gauge asks the Codex program on this Mac for your limits and when they reset. Sign in once with your ChatGPT account using the command codex login."),
+                              actionButton("Refresh now", target: self, action: #selector(refresh))]),
+            group("Alerts", [notifyCheckbox, help("A normal macOS notification at 20%, 10% and 0% left. macOS asks your permission the first time.")])
+        ])
+        addTab("Copilot", [
+            group("Usage", [copilotCheckbox, settingsRow("Monthly requests", control: copilotLimitField),
+                help("Counts your prompts from Copilot CLI logs on this Mac, per calendar month (UTC). Allowance: Free 50, Pro or Business 300, Enterprise 1000, Pro+ 1500, or type your own. VS Code, github.com and mobile chats are not included.")]),
+            group("Exact total", [billingCheckbox,
+                help("Asks GitHub for your real total through your own GitHub login (the gh tool), including VS Code and the website. Needs a one-time setup, described in the README."),
+                billingStatus])
+        ])
+        addTab("General", [
+            group("Display", [notchCheckbox, help("Shows your numbers beside the notch. Off: they appear in the menu bar instead.")]),
+            group("Start and refresh", [loginCheckbox, settingsRow("Reload numbers", control: interval),
+                help("Gauge must be in the Applications folder to open at login.")]),
+            group("Privacy", [status])
+        ])
+        reload()
+        fit(animated: false)
+    }
+
+    /// Sizes the window to the selected tab so it never stretches taller than it needs to.
+    private func fit(animated: Bool = true) {
+        guard let window, let item = tabView.selectedTabViewItem else { return }
+        let index = tabView.indexOfTabViewItem(item)
+        guard tabStacks.indices.contains(index) else { return }
+        let stack = tabStacks[index]
+        item.view?.layoutSubtreeIfNeeded()
+        let chrome = tabView.frame.height - tabView.contentRect.height
+        let height = ceil(stack.fittingSize.height) + 18 + 24 + chrome
+        let target = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: Self.windowWidth, height: height))
+        var frame = window.frame
+        frame.origin.y += frame.height - target.height   // keep the title bar where it is
+        frame.size = target.size
+        window.setFrame(frame, display: true, animate: animated && window.isVisible)
+    }
+    func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) { fit() }
+    @objc private func toggleManual() { manualBody.isHidden = manualToggle.state != .on; fit() }
+
     /// Lightweight update for values that change in the background (does not touch editable controls).
     func refreshStatus() {
         updateLimitsUI()
+        updateBillingNote()
+    }
+    private func updateBillingNote() {
         billingStatus.stringValue = model.billingNote ?? ""
-        billingStatus.isHidden = model.billingNote == nil
+        let hide = model.billingNote == nil
+        if billingStatus.isHidden != hide { billingStatus.isHidden = hide; fit(animated: false) }
     }
     func reload() {
         updateLimitsUI()
@@ -480,15 +569,15 @@ final class SettingsWindowController: NSWindowController {
         copilotCheckbox.state = model.useCopilot ? .on : .off
         copilotLimitField.stringValue = String(model.copilotLimit)
         billingCheckbox.state = model.useGitHubBilling ? .on : .off
-        billingStatus.stringValue = model.billingNote ?? ""
-        billingStatus.isHidden = model.billingNote == nil
+        updateBillingNote()
         claudeCodeCheckbox.state = model.useClaudeCode ? .on : .off
         claudeUnitPopup.selectItem(at: model.claudeUnit == "tokens" ? 1 : 0)
         notchCheckbox.state = model.showNotch ? .on : .off
         notifyCheckbox.state = model.notify ? .on : .off
         loginCheckbox.state = model.launchAtLogin ? .on : .off
         interval.selectItem(at: [1,5,10,15].firstIndex(of: model.refreshMinutes) ?? 1)
-        status.stringValue = model.loginError ?? "Local-only · No passwords or session cookies collected"
+        status.stringValue = model.loginError ?? "Gauge keeps everything on this Mac. It never asks for passwords, reads cookies or sends your data anywhere."
+        status.textColor = model.loginError == nil ? .secondaryLabelColor : .systemOrange
     }
     @objc private func saveClaude() { model.saveClaude(session: session.indexOfSelectedItem - 1, weekly: weekly.indexOfSelectedItem - 1, reset: resetPicker.dateValue) }
     @objc private func clearClaude() { model.clearClaude(); reload() }
@@ -506,6 +595,12 @@ final class SettingsWindowController: NSWindowController {
     private func updateLimitsUI() {
         let connected = ClaudeConnector.isConnected
         limitsButton.title = connected ? "Disconnect" : "Connect Claude limits"
+        if ClaudeConnector.managedPolicyBlocksStatusLine {
+            limitsStatus.stringValue = "Blocked by your organization's Claude Code policy"
+            limitsStatus.textColor = .systemOrange
+            return
+        }
+        limitsStatus.textColor = .secondaryLabelColor
         if !connected { limitsStatus.stringValue = "Not connected"; return }
         if let limits = model.claudeLimits {
             let minutes = max(0, Int(Date().timeIntervalSince(limits.updatedAt) / 60))
@@ -527,6 +622,13 @@ final class SettingsWindowController: NSWindowController {
         if ClaudeConnector.isConnected {
             do { try ClaudeConnector.disconnect() } catch { fail(error) }
             updateLimitsUI()
+            return
+        }
+        if ClaudeConnector.managedPolicyBlocksStatusLine {
+            let blocked = NSAlert()
+            blocked.messageText = "Your organization blocks this"
+            blocked.informativeText = "Your company's Claude Code settings only allow status lines and hooks that the company manages (allowManagedHooksOnly). Claude Code would silently ignore Gauge's, so nothing would arrive. Gauge left your settings untouched.\n\nAsk your administrator to allow it or to add Gauge as the managed status line. Meanwhile Gauge keeps estimating from Claude Code's local logs, and you can type your percentages by hand below."
+            blocked.runModal()
             return
         }
         let executable = Bundle.main.executablePath ?? CommandLine.arguments[0]

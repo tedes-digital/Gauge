@@ -83,7 +83,7 @@ struct CodexClient {
             input.fileHandleForWriting.write(payload + Data([10]))
         }
         try send(["id": 1, "method": "initialize", "params": [
-            "clientInfo": ["name": "gauge", "title": "Gauge", "version": "0.3.1"],
+            "clientInfo": ["name": "gauge", "title": "Gauge", "version": "0.3.2"],
             "capabilities": [:] as [String: String]
         ]])
         let initialized = try collector.wait(for: 1, timeout: 8)

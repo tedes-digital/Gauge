@@ -126,6 +126,24 @@ enum ClaudeConnector {
     }
     private static let marker = "--statusline"
 
+    /// Files where an organization's managed Claude Code settings live (server-delivered cache and the file-based policy).
+    private static var managedSettingsURLs: [URL] {
+        [settingsURL.deletingLastPathComponent().appendingPathComponent("remote-settings.json"),
+         URL(fileURLWithPath: "/Library/Application Support/ClaudeCode/managed-settings.json")]
+    }
+
+    /// True when the organization restricts Claude Code to managed hooks only. Claude Code then silently ignores any
+    /// user-level status line, so Gauge could not receive limits however it is connected. Not something to work around:
+    /// the administrator has to allow it (or set a managed status line).
+    static var managedPolicyBlocksStatusLine: Bool {
+        for url in managedSettingsURLs {
+            guard let data = try? Data(contentsOf: url),
+                  let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { continue }
+            if (object["allowManagedHooksOnly"] as? Bool) == true && object["statusLine"] == nil { return true }
+        }
+        return false
+    }
+
     private static func load() throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: settingsURL.path) else { return [:] }
         let data = try Data(contentsOf: settingsURL)

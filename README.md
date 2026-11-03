@@ -129,7 +129,7 @@ You can have Gauge open by itself every time you log in, so it is always there.
 
 1. Make sure Gauge is in your **Applications** folder (see step 3).
 2. Open Gauge's **Settings** (click the gear on the card, or right-click the menu-bar icon → **Settings…**).
-3. Scroll to **App behavior** and tick **Launch at Login**.
+3. Open the **General** tab and tick **Open Gauge when I log in**.
 
 To turn it off, untick the same box.
 
@@ -151,12 +151,14 @@ This gives you an estimate of what you spent (in dollars or tokens). To see your
 
 Claude does not let other programs read your limit directly, but Claude Code itself knows it and can pass it on. This works if you have a **Claude Pro, Max or Ultra** subscription, or if your company runs Claude Code behind a gateway with a **spend limit** (then you also see your spend and budget in dollars).
 
-1. Open Gauge's **Settings** (gear on the card).
-2. Under **Claude · real limits from Claude Code**, click **Connect Claude limits**.
+1. Open Gauge's **Settings** (gear on the card) and go to the **Claude** tab.
+2. Under **Real limits from Claude Code**, click **Connect Claude limits**.
 3. Gauge explains what it will change. Click **Connect**.
 4. Use Claude Code as usual. After its next reply, the Claude row shows your real percentage left and when it resets. Claude Code sessions that were already open may need a restart.
 
 What this does: it adds one entry called `statusLine` to Claude Code's settings file (`~/.claude/settings.json`). Gauge saves a backup copy next to it first (`settings.json.gauge-backup`). If you already have your own status line, it keeps working: Gauge passes the information on to it. Click **Disconnect** in the same place to put everything back exactly as it was.
+
+**Work computers:** some companies tell Claude Code to ignore status lines and hooks that the company did not set up itself. If yours does, Claude Code silently skips Gauge's, so no limits can arrive. Gauge detects this and says "Blocked by your organization's Claude Code policy" in Settings instead of failing quietly. It does not try to get around the policy: ask your IT or Claude administrator to allow it. Gauge keeps working with its estimate from Claude Code's logs, and you can type your percentages by hand.
 
 If you move Gauge out of the Applications folder, click Disconnect and then Connect again. Plans that do not report limits (for example pay-per-use API keys) show nothing extra here, and Settings tells you so.
 
@@ -197,7 +199,7 @@ This is switched off by default. It asks GitHub for your real number, including 
    ```
 
    GitHub asks for a permission called "user". GitHub requires it for billing numbers. If you are not comfortable with it, simply skip this step: Gauge works fine without it.
-3. In Gauge's Settings, tick **Exact total from GitHub billing**.
+3. In Gauge's Settings, open the **Copilot** tab and tick **Use GitHub billing for the exact total**.
 
 If it does not work (for example because your company manages your GitHub account), Gauge tells you why in Settings and keeps using the numbers from your Mac.
 
@@ -231,58 +233,60 @@ The numbers next to the notch are the same values in short form.
 
 ## 8. Settings, one by one
 
-Open Settings with the **gear** on the card, or right-click the menu-bar icon → **Settings…**.
+Open Settings with the **gear** on the card, or right-click the menu-bar icon → **Settings…**. The window has four tabs, one per tool, plus **General**. Each setting lives only in its own tab.
 
-### Claude Code
+### Claude tab
 
-| Setting | What it does |
-|---------|--------------|
-| **Track Claude Code usage from local logs** | On: Gauge reads Claude Code's history on your Mac and shows your usage. Off: Gauge stops reading it. |
-| **Claude Code shows** | Choose **Dollars (API list prices)** or **Tokens**. Dollars shows what your usage would cost at Anthropic's public prices. Tokens shows the raw amount of text processed. Plans like Pro, Max and Team are not billed per token, so for them dollars is a guide to the value you get, not a charge. |
-
-### Claude real limits
+**Usage on this Mac**
 
 | Setting | What it does |
 |---------|--------------|
-| **Connect Claude limits / Disconnect** | Connect: lets Claude Code pass Gauge your real limits (see [section 6](#optional-real-claude-limits-from-claude-code)). Disconnect: removes the entry and restores your previous settings. The line next to the button tells you whether it is connected and when numbers last arrived. |
+| **Track Claude Code usage on this Mac** | On: Gauge reads Claude Code's history on your Mac and shows your usage. Off: Gauge stops reading it. |
+| **Show as** | **Dollars (at API prices)** shows what your usage would cost at Anthropic's public prices. **Tokens** shows the raw amount of text processed. On Pro, Max and Team plans you are not billed per token, so dollars shows the value you get, not a charge. |
 
-### Claude manual numbers
+**Real limits from Claude Code**
+
+| Setting | What it does |
+|---------|--------------|
+| **Connect Claude limits / Disconnect** | Connect: lets Claude Code pass Gauge your real limits (see [section 6](#optional-real-claude-limits-from-claude-code)). Disconnect: removes the entry and restores your previous settings. The text next to the button says whether it is connected, when numbers last arrived, or if your organization blocks it. |
+
+**Enter percentages by hand** (click the arrow to open it)
 
 <a id="claude-manual-numbers"></a>
 
-Optional, and only needed if you do not connect the real limits above. Claude's website shows your limit as percentages; copy them by hand if you want them in Gauge. A recent manual value (less than an hour old) is shown instead of the dollars or tokens.
+Only needed if you do not connect real limits. Copy the percentages from claude.ai → Settings → Usage. A value saved less than an hour ago is shown instead of dollars or tokens.
 
 | Setting | What it does |
 |---------|--------------|
-| **5-hour remaining** | The percentage left in your 5-hour window, as shown on Claude's usage page. |
-| **Weekly remaining** | The percentage left for the week. |
-| **Session reset** | When your 5-hour window resets. |
-| **Save snapshot** | Saves the three values above. |
+| **5-hour window left** | The percentage left in your 5-hour window. |
+| **Weekly limit left** | The percentage left for the week. |
+| **Window resets at** | When your 5-hour window resets. |
+| **Save** | Saves the three values above. |
 | **Clear** | Deletes the saved values. |
-| **Open Claude Usage** | Opens Claude's usage page in your browser so you can copy the numbers. |
+| **Open Claude usage page** | Opens Claude's usage page in your browser so you can copy the numbers. |
 
-### ChatGPT (Codex)
-
-| Setting | What it does |
-|---------|--------------|
-| **Refresh Codex now** | Asks Codex for fresh numbers right away. |
-
-### GitHub Copilot
+### ChatGPT tab
 
 | Setting | What it does |
 |---------|--------------|
-| **Track GitHub Copilot CLI requests** | On: counts your requests from the Copilot command-line tool, month by month. Off: hides the Copilot row. |
-| **Exact total from GitHub billing (uses your gh login)** | Off by default. On: asks GitHub for your real total, including VS Code and the website. Needs the one-time setup in [section 6](#optional-exact-copilot-total-from-github). |
+| **Refresh now** | Asks Codex for fresh numbers right away. |
+| **Notify me when my limit is almost used up** | Sends a normal macOS notification when your ChatGPT (Codex) limit reaches 20%, 10% and 0% left. macOS asks your permission the first time. |
+
+### Copilot tab
+
+| Setting | What it does |
+|---------|--------------|
+| **Count my Copilot CLI requests** | On: counts your requests from the Copilot command-line tool, month by month. Off: hides the Copilot row. |
 | **Monthly requests** | Your plan's monthly allowance. Pick one (Free 50, Pro or Business 300, Enterprise 1000, Pro+ 1500) or type your own number. The bar is drawn against this number. |
+| **Use GitHub billing for the exact total** | Off by default. On: asks GitHub for your real total, including VS Code and the website. Needs the one-time setup in [section 6](#optional-exact-copilot-total-from-github). |
 
-### App behavior
+### General tab
 
 | Setting | What it does |
 |---------|--------------|
-| **Show notch panel** | On: the black area next to the notch (or at the top of the screen) with your numbers. Off: it disappears and the numbers move to the menu bar. |
-| **Notify when Codex has 20%, 10%, or 0% left** | Sends a normal macOS notification when your ChatGPT (Codex) limit gets low. macOS asks your permission the first time. |
-| **Launch at Login** | Opens Gauge automatically when you log in to your Mac. |
-| **Auto-refresh** | How often Gauge reloads the numbers: every 1, 5, 10 or 15 minutes. 5 is a good choice. |
+| **Show Gauge next to the notch** | On: the black area next to the notch (or at the top of the screen) with your numbers. Off: it disappears and the numbers move to the menu bar. |
+| **Open Gauge when I log in** | Opens Gauge automatically when you log in to your Mac. |
+| **Reload numbers** | How often Gauge reloads the numbers: every 1, 5, 10 or 15 minutes. 5 is a good choice. |
 
 ---
 
@@ -318,13 +322,16 @@ It appears only after the Copilot command-line tool has been used on this Mac. I
 **The numbers are different from the website.**
 Gauge counts only this Mac, and Claude and Copilot numbers are estimates (see [section 9](#9-understanding-the-numbers)).
 
+**Settings says "Blocked by your organization's Claude Code policy".**
+Your company's Claude Code settings only allow status lines that the company manages, so Claude Code ignores Gauge's. Ask your administrator to allow it. Until then, use the estimate or type your percentages by hand.
+
 **Claude shows a note instead of a bar, or says `Stale`.**
 The real limit appears after you click **Connect Claude limits** and Claude Code replies once. It says *Stale* when Claude Code has not reported for a while (for example if you only use Claude on the website). Numbers refresh every few minutes; click ⟳ to refresh now.
 
 **Claude shows `Idle` or an old number.**
 Numbers refresh every few minutes. Click ⟳ on the card to refresh now.
 
-**I turned on Launch at Login, but it does not start.**
+**I turned on "Open Gauge when I log in", but it does not start.**
 Make sure Gauge is in the **Applications** folder, then switch the setting off and on again, or add it in **System Settings → General → Login Items** (see [section 5](#5-start-gauge-automatically-when-you-turn-on-your-mac)).
 
 ---
@@ -338,7 +345,7 @@ Make sure Gauge is in the **Applications** folder, then switch the setting off a
 1. If you connected Claude limits, open Settings and click **Disconnect** first.
 2. Quit Gauge (above).
 3. Open **Applications** and drag **Gauge** to the **Trash**.
-4. If you switched on Launch at Login, also remove Gauge from **System Settings → General → Login Items**.
+4. If you switched on "Open Gauge when I log in", also remove Gauge from **System Settings → General → Login Items**.
 
 Gauge saves only your settings, plus the latest Claude limits if you connected them, in small files on your Mac (`~/Library/Preferences` and `~/Library/Application Support/Gauge`). Nothing else is left behind, and Gauge never changed your AI tools' files.
 

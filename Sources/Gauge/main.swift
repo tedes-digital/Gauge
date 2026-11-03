@@ -130,14 +130,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastNotchEnabled = model.showNotch
             if model.showNotch { buildNotch() } else { tearDownNotch() }
         }
-        if islandPanel != nil { updateBadgeText() }
+        if islandPanel != nil, updateBadgeText() { applyNotchLayout() }
     }
 
-    private static let perLabelWidth: CGFloat = 60   // badge width per service, to the left of the physical notch
+    private static let minSlotWidth: CGFloat = 60    // badge width per service, to the left of the physical notch (grows with the text)
+    private var slotWidth: CGFloat = 60
     private static let cardGap: CGFloat = 6           // free space between the island and the card below it
     private static let cardRim: CGFloat = 8           // transparent margin so the spring can overshoot without clipping
     private var rowCount: Int { max(1, model.cards.count) }   // an empty island still shows a placeholder
-    private var leftWidth: CGFloat { Self.perLabelWidth * CGFloat(rowCount) }
+    private var leftWidth: CGFloat { slotWidth * CGFloat(rowCount) }
 
     /// Prefers the display that has a physical notch; otherwise the one with the menu bar.
     private var targetScreen: NSScreen? {
@@ -226,12 +227,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cardPanel = nil
     }
 
-    private func updateBadgeText() {
+    /// Fills the badge labels and widens the slots if a value needs more room. Returns true when the slot width changed,
+    /// so the island must be laid out again. Text never wraps: a wrapped second line would be clipped and vanish.
+    @discardableResult
+    private func updateBadgeText() -> Bool {
         let cards = model.cards
         let slots = max(1, cards.count)   // nothing found yet: one placeholder label
         while badgeLabels.count < slots {
             let label = makeLabel("", size: 12, weight: .medium)
             label.alignment = .center
+            label.maximumNumberOfLines = 1
+            label.lineBreakMode = .byClipping
             badge.addSubview(label)
             badgeLabels.append(label)
         }
@@ -239,21 +245,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if cards.isEmpty {
             badgeLabels[0].attributedStringValue = NSAttributedString(string: "Gauge", attributes: [
                 .font: badgeLabels[0].font ?? NSFont.systemFont(ofSize: 12), .foregroundColor: Palette.muted])
-            return
+        } else {
+            for (label, card) in zip(badgeLabels, cards) {
+                label.attributedStringValue = ProviderIcons.label(card, text: card.barText, font: label.font ?? .systemFont(ofSize: 12),
+                                                                  color: .white, gap: " ")
+            }
         }
-        for (label, card) in zip(badgeLabels, cards) {
-            label.attributedStringValue = ProviderIcons.label(card, text: card.barText, font: label.font ?? .systemFont(ofSize: 12),
-                                                              color: .white, gap: " ")
-        }
+        let widest = badgeLabels.map { ceil($0.attributedStringValue.size().width) }.max() ?? 0
+        let needed = max(Self.minSlotWidth, widest + 14)
+        guard abs(needed - slotWidth) > 0.5 else { return false }
+        slotWidth = needed
+        return true
     }
 
     /// Positions both panels for the current screen and service count (no animation).
     private func applyNotchLayout() {
         guard let island = islandPanel, let card = cardPanel, let screen = targetScreen else { return }
+        updateBadgeText()   // may widen the slots, which changes the island rect
         let rect = islandRect(screen)
         island.setFrame(rect, display: false)
         badge.frame = NSRect(origin: .zero, size: rect.size)
-        updateBadgeText()
         let visible = notchWidth(screen) > 0 ? leftWidth : rect.width   // labels never sit behind the notch
         let each = max(1, visible - 8) / CGFloat(max(1, badgeLabels.count))
         for (index, label) in badgeLabels.enumerated() {
