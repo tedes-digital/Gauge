@@ -184,7 +184,7 @@ final class AppModel {
     var cards: [ProviderCard] {
         var list = [
             ProviderCard(id: "claude", glyph: "✳", name: "Claude", tint: Palette.orange, barText: claudeBarText,
-                         cardText: claudeCardText, progress: claudeProgress, progressIsExact: manualClaudeFresh,
+                         cardText: claudeCardText, progress: claudeProgress, progressIsExact: manualClaudeFresh, caption: claudeCaption,
                          lines: rows(claudeProjectLines)),
             ProviderCard(id: "codex", glyph: "✦", name: "ChatGPT", tint: Palette.blue, barText: codexBarText,
                          cardText: codexCardText, progress: codexProgress,
@@ -194,14 +194,22 @@ final class AppModel {
         return list
     }
     /// Text for the dashboard card.
+    /// Explains what the Claude number is when there is no real remaining amount to draw as a bar.
+    var claudeCaption: String? {
+        guard !manualClaudeFresh, let local = claudeLocal else { return nil }
+        if local.sessionTokens != nil {
+            let left = shortCountdown(local.sessionResetsAt, now: now) ?? "ending"
+            return "This 5-hour session · \(left) left"
+        }
+        return "No active session · last 7 days"
+    }
     var claudeCardText: String {
         if manualClaudeFresh { return "\(claudeSession)% left" }
         if let local = claudeLocal {
             if let tokens = local.sessionTokens {
-                let amount = claudeAmount(tokens: tokens, cost: local.sessionCost ?? 0)
-                return "\(amount) · \(resetText(local.sessionResetsAt, now: now).replacingOccurrences(of: "Resets in ", with: ""))"
+                return claudeAmount(tokens: tokens, cost: local.sessionCost ?? 0)
             }
-            return "Idle · \(claudeAmount(tokens: local.weeklyTokens, cost: local.weeklyCost)) / 7d"
+            return claudeAmount(tokens: local.weeklyTokens, cost: local.weeklyCost)
         }
         if claudeSession >= 0 { return "\(claudeSession)% left · Stale" }
         if claudeWeekly >= 0 { return "\(claudeWeekly)% weekly" }

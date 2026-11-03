@@ -194,16 +194,17 @@ If it does not work (for example because your company manages your GitHub accoun
 The card has one row per tool. Each row has:
 
 - **The tool's logo and name** (Claude, ChatGPT, Copilot).
-- **A line of text on the right**, for example `$10.8 · 1h 18m`.
-- **A coloured bar** underneath. It turns **red** when little is left.
+- **A number on the right**, for example `$10.8` or `79% left`.
+- **A coloured bar** underneath that shows how much is left. It turns **red** when little is left.
+- For Claude, if you have not typed in percentages, a **short note** instead of a bar, saying what the number is (see below). Claude does not publish how much of your limit is left, so there is nothing real to draw as a bar.
 
 What the text means for each tool:
 
 | Tool | Text | Meaning |
 |------|------|---------|
-| **Claude** | `$10.8 · 1h 18m` | What this 5-hour session cost at normal public prices, and how long until the session ends. In tokens mode, it shows a token count instead of dollars. |
-| **Claude** (idle) | `Idle · $270 / 7d` | No session is running. This is the total for the last 7 days. |
-| **Claude** (with percentages typed in) | `62% left` | The percentage you copied from the Claude website. |
+| **Claude** | `$10.8` and the note *This 5-hour session · 1h 18m left* | What this 5-hour session cost at normal public prices, and how long until the session ends. In tokens mode, it shows a token count instead of dollars. |
+| **Claude** (idle) | `$270` and the note *No active session · last 7 days* | No session is running. This is the total for the last 7 days. |
+| **Claude** (with percentages typed in) | `62% left` and a bar | The percentage you copied from the Claude website. |
 | **ChatGPT** | `79% left · 3d 4h` | How much of your limit is left, and when it resets. |
 | **Copilot** | `12 / 300 req` | Requests used this month out of your monthly allowance. |
 
@@ -268,7 +269,7 @@ Optional. Claude's website shows your real limit as percentages, but programs ca
 
 - **Dollars are not a bill.** They are an estimate of what the same usage would cost at the normal public prices of Anthropic's service. If you use a subscription (Pro, Max, Team), you do not pay per token, so the dollar figure is just a way to compare days and projects. If your company pays by usage, it is a good guide, but your real invoice may be a little different because of discounts and extras.
 - **Only this Mac is counted.** Using a website, a phone app or another computer does not appear in Gauge.
-- **Limits are not published.** Claude does not tell programs how much of your limit is left, which is why the bar for Claude shows the time left in your session unless you type in the percentages. ChatGPT is different: its real limit comes straight from Codex.
+- **Limits are not published.** Claude does not tell programs how much of your limit is left, which is why Claude shows a note about your session (instead of a bar) unless you type in the percentages. ChatGPT is different: its real limit comes straight from Codex.
 - **Copilot is an estimate** unless you turn on the exact total. GitHub's own billing page is always the final word.
 
 ---

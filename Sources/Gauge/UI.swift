@@ -146,6 +146,7 @@ final class DashboardViewController: NSViewController {
         let name: NSTextField
         let status: NSTextField
         let bar: ProgressBar
+        let caption: NSTextField
     }
 
     private let model: AppModel
@@ -245,6 +246,9 @@ final class DashboardViewController: NSViewController {
             row.status.stringValue = card.cardText
             row.bar.isExact = card.progressIsExact
             row.bar.progress = card.progress
+            row.bar.isHidden = card.caption != nil
+            row.caption.isHidden = card.caption == nil
+            row.caption.stringValue = card.caption ?? ""
         }
 
         if model.error != nil {
@@ -288,9 +292,12 @@ final class DashboardViewController: NSViewController {
         let name = makeLabel("", size: 15, color: card.tint, weight: .medium)
         let status = makeLabel("", size: 15, color: Palette.muted)
         let bar = ProgressBar(tint: card.tint)
+        let caption = makeLabel("", size: 10.5, color: Palette.muted)
+        caption.maximumNumberOfLines = 1
+        caption.isHidden = true
         status.alignment = .right
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        for sub in [name, status, bar] { row.addSubview(sub); sub.translatesAutoresizingMaskIntoConstraints = false }
+        for sub in [name, status, bar, caption] { row.addSubview(sub); sub.translatesAutoresizingMaskIntoConstraints = false }
         NSLayoutConstraint.activate([
             row.heightAnchor.constraint(equalToConstant: 50),
             name.leadingAnchor.constraint(equalTo: row.leadingAnchor),
@@ -299,11 +306,14 @@ final class DashboardViewController: NSViewController {
             bar.trailingAnchor.constraint(equalTo: row.trailingAnchor),
             bar.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -6),
             bar.heightAnchor.constraint(equalToConstant: 4),
+            caption.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            caption.trailingAnchor.constraint(lessThanOrEqualTo: row.trailingAnchor),
+            caption.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -3),
             status.leadingAnchor.constraint(greaterThanOrEqualTo: name.trailingAnchor, constant: 12),
             status.trailingAnchor.constraint(equalTo: row.trailingAnchor),
             status.centerYAnchor.constraint(equalTo: row.centerYAnchor, constant: -4)
         ])
-        return Row(id: card.id, view: row, name: name, status: status, bar: bar)
+        return Row(id: card.id, view: row, name: name, status: status, bar: bar, caption: caption)
     }
 
     private func iconButton(_ symbol: String, label: String, action: Selector) -> NSButton {
