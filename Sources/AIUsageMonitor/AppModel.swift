@@ -54,12 +54,13 @@ final class AppModel {
     private func changed() { onChange?() }
 
     func start() {
-        tickTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        tickTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.now = .now
                 self?.changed()
             }
         }
+        tickTimer?.tolerance = 5
         setupRefreshTimer()
         refresh()
     }
@@ -73,7 +74,7 @@ final class AppModel {
         guard !busy else { return }
         busy = true
         changed()
-        DispatchQueue.global(qos: .utility).async {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             let result = Result { try CodexClient().fetch() }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }

@@ -8,6 +8,11 @@ private enum Palette {
     static let blue = NSColor(calibratedRed: 0.59, green: 0.74, blue: 0.98, alpha: 1)
 }
 
+enum Layout {
+    /// Size of the usage card (menu-bar popover and notch panel share it).
+    static let card = NSSize(width: 300, height: 170)
+}
+
 @MainActor
 func makeLabel(_ title: String, size: CGFloat = 12, color: NSColor = .white, weight: NSFont.Weight = .regular) -> NSTextField {
     let label = NSTextField(labelWithString: title)
@@ -47,9 +52,9 @@ func horizontalStack(spacing: CGFloat = 8) -> NSStackView {
 @MainActor
 final class DashboardViewController: NSViewController {
     private let model: AppModel
-    private let claudeStatus = makeLabel("", size: 23, color: Palette.muted)
-    private let codexStatus = makeLabel("", size: 23, color: Palette.muted)
-    private let updatedStatus = makeLabel("", size: 14, color: Palette.muted)
+    private let claudeStatus = makeLabel("", size: 15, color: Palette.muted)
+    private let codexStatus = makeLabel("", size: 15, color: Palette.muted)
+    private let updatedStatus = makeLabel("", size: 11, color: Palette.muted)
     private let refreshButton = NSButton()
 
     init(model: AppModel) {
@@ -59,47 +64,47 @@ final class DashboardViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
 
     override func loadView() {
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 700, height: 360))
+        let root = NSView(frame: NSRect(origin: .zero, size: Layout.card))
         root.wantsLayer = true
         root.layer?.backgroundColor = Palette.background.cgColor
-        root.layer?.cornerRadius = 38
+        root.layer?.cornerRadius = 22
         root.layer?.masksToBounds = true
 
         let stack = verticalStack(spacing: 0)
         stack.alignment = .width
         root.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -24),
-            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 22),
-            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -20)
+            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 18),
+            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -18),
+            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 14),
+            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10)
         ])
 
         let heading = horizontalStack(spacing: 0)
-        heading.addArrangedSubview(makeLabel("AI Usage", size: 27, weight: .medium))
+        heading.addArrangedSubview(makeLabel("AI Usage", size: 15, weight: .medium))
         let headingSpacer = NSView()
         headingSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         heading.addArrangedSubview(headingSpacer)
         let settingsButton = iconButton("gearshape", label: "Settings", action: #selector(settings))
         heading.addArrangedSubview(settingsButton)
-        heading.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        heading.heightAnchor.constraint(equalToConstant: 28).isActive = true
         stack.addArrangedSubview(heading)
-        stack.setCustomSpacing(18, after: heading)
+        stack.setCustomSpacing(6, after: heading)
 
         let claudeRow = providerRow("✳  Claude", status: claudeStatus, color: Palette.orange)
         stack.addArrangedSubview(claudeRow)
-        stack.setCustomSpacing(14, after: claudeRow)
+        stack.setCustomSpacing(0, after: claudeRow)
 
         let divider = NSView()
         divider.wantsLayer = true
         divider.layer?.backgroundColor = NSColor(calibratedWhite: 0.25, alpha: 1).cgColor
         divider.heightAnchor.constraint(equalToConstant: 1).isActive = true
         stack.addArrangedSubview(divider)
-        stack.setCustomSpacing(14, after: divider)
+        stack.setCustomSpacing(0, after: divider)
 
         let codexRow = providerRow("✦  ChatGPT", status: codexStatus, color: Palette.blue)
         stack.addArrangedSubview(codexRow)
-        stack.setCustomSpacing(8, after: codexRow)
+        stack.setCustomSpacing(4, after: codexRow)
 
         let footer = horizontalStack(spacing: 0)
         footer.addArrangedSubview(updatedStatus)
@@ -113,10 +118,10 @@ final class DashboardViewController: NSViewController {
         refreshButton.action = #selector(refresh)
         refreshButton.toolTip = "Refresh usage"
         refreshButton.setContentHuggingPriority(.required, for: .horizontal)
-        refreshButton.widthAnchor.constraint(equalToConstant: 32).isActive = true
-        refreshButton.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        refreshButton.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        refreshButton.heightAnchor.constraint(equalToConstant: 24).isActive = true
         footer.addArrangedSubview(refreshButton)
-        footer.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        footer.heightAnchor.constraint(equalToConstant: 24).isActive = true
         stack.addArrangedSubview(footer)
 
         view = root
@@ -160,7 +165,7 @@ final class DashboardViewController: NSViewController {
 
     private func providerRow(_ title: String, status: NSTextField, color: NSColor) -> NSView {
         let row = NSView()
-        let name = makeLabel(title, size: 27, color: color, weight: .medium)
+        let name = makeLabel(title, size: 15, color: color, weight: .medium)
         status.alignment = .right
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         row.addSubview(name)
@@ -168,7 +173,7 @@ final class DashboardViewController: NSViewController {
         name.translatesAutoresizingMaskIntoConstraints = false
         status.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            row.heightAnchor.constraint(equalToConstant: 82),
+            row.heightAnchor.constraint(equalToConstant: 42),
             name.leadingAnchor.constraint(equalTo: row.leadingAnchor),
             name.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             status.leadingAnchor.constraint(greaterThanOrEqualTo: name.trailingAnchor, constant: 12),
@@ -186,8 +191,8 @@ final class DashboardViewController: NSViewController {
         button.target = self
         button.action = action
         button.toolTip = label
-        button.widthAnchor.constraint(equalToConstant: 36).isActive = true
-        button.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        button.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 28).isActive = true
         return button
     }
 

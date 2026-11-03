@@ -1,56 +1,45 @@
-# AI Usage Monitor — AppKit edition (no Xcode / NotchKit dependency)
+# AI Usage Monitor
 
-## What it does
+A tiny macOS menu-bar app that shows how much of your **Claude** and **ChatGPT (Codex)** usage is left. Hover the notch area at the top of the screen, or click the menu-bar item, to see a compact usage card.
 
-Native menu-bar app for macOS 14+, with a compact rounded usage card in the menu-bar popover and top-center notch panel. The notch card expands on hover and shares the same provider summary, refresh control and settings shortcut. Includes Codex rate-limit readout, manual Claude subscription entries, reset countdown in Settings, auto-refresh, notification thresholds, and Launch at Login (when bundled).
+- Native AppKit, no Xcode project, no third-party dependencies
+- Local only: no servers, no passwords, no browser cookies
+- macOS 14 (Sonoma) or newer, Apple Silicon and Intel
 
-- **Claude:** manual snapshot of 5-hour + weekly percentages from Claude Settings → Usage. Never represented as live data. When 1 hour old, marked potentially outdated. Reset countdown does NOT reset the stored percent.
-- **ChatGPT:** reads *Codex* limits only through local `codex app-server` stdio RPC. Not general ChatGPT chat limits, and not spending balance. If unavailable, says so. Last successful values remain but are visibly stale.
-- Local-only, no passwords/cookies, no server and no third-party Swift dependencies.
-- Menu bar and notch can be temporarily covered/hidden by macOS fullscreen or system UI, depending on display configuration. Notch panel is a visual imitation, not an Apple Dynamic Island API.
+## Install
 
-## Run in VS Code, using Apple Command Line Tools
+1. Download `AIUsageMonitor.zip` from the [Releases](../../releases) page and unzip it.
+2. Move `AIUsageMonitor.app` to `/Applications`.
+3. The first time, right-click the app → **Open** → **Open** (the app is not notarized).
 
-Open this directory in VS Code. Terminal commands:
+Then connect your AI accounts:
 
-```bash
-swift --version
-swift build
-swift run AIUsageMonitor
-```
+| Provider | How to connect |
+|----------|----------------|
+| **ChatGPT / Codex** | Install the [Codex CLI](https://github.com/openai/codex) and run `codex login` with your ChatGPT account. Usage is then read automatically. |
+| **Claude** | Open Settings (gear icon) → **Open Claude Usage**, then copy the percentages into the app. Claude has no public usage API, so this part is manual. |
 
-No Apple Account or Xcode GUI is needed **if the installed Command Line Tools are capable of compiling AppKit on your Mac**. Compilation was syntax-checked on Linux, but cannot be fully linked/run in this environment because Apple frameworks aren't present. If AppKit compilation itself fails, the CLT installation may be insufficient and require company IT support.
+Optional in Settings: notch panel on/off, low-usage notifications (20% / 10% / 0%), auto-refresh interval, Launch at Login.
 
-## Create a local .app
+## Build from source
 
-```bash
-./build-app.sh
-open dist/AIUsageMonitor.app
-```
-
-This builds a self-contained local `.app` with an ad-hoc signature, **not** a notarized distributable app. Depending on corporate macOS policy, Gatekeeper/MDM may restrict it. To register Launch at Login reliably, move the bundle into `/Applications` or `~/Applications` before enabling it (where company policies allow).
-
-The app uses macOS system notification permission; when running as a raw Swift executable notifications can fail to appear. Try the `.app` bundle.
-
-## Codex
-
-Install the Codex CLI through your approved method and authenticate with your ChatGPT subscription (`codex login`). Ensure `codex app-server` works. Without Codex CLI, Claude and the UI still work, while Codex shows an error.
-
-## If compilation fails
-
-Save the output:
+Requires Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
-swift build 2>&1 | tee build.log
-grep -n 'error:' build.log | head -25
+swift run AIUsageMonitor      # run directly
+./build-app.sh                # builds dist/AIUsageMonitor.app and dist/AIUsageMonitor.zip
 ```
 
-Unlike the first version, this package does not include NotchKit, SwiftUI, `#Preview`, `@State`, or any external Swift package dependencies.
+`build-app.sh` produces a universal, ad-hoc-signed bundle. For Launch at Login and notifications, use the `.app` rather than `swift run`.
 
-## Current limitations
+## How it works
 
-- AppKit notch is a custom overlay; pointer proximity is checked with a global mouse-move event monitor. macOS may limit global mouse monitoring on managed devices, in which case the menu-bar popover still works.
-- Notch location uses the primary screen center and needs testing on different multi-monitor layouts and menu-bar configurations.
-- No data is read automatically from Claude Pro/Max subscriptions.
-- Codex CLI response formats may change; no guarantee of access to all ChatGPT model quotas.
-- The app is not an official Anthropic or OpenAI product.
+- **ChatGPT:** talks to the local `codex app-server` over stdio and reads the Codex rate limits. These are Codex limits, not every ChatGPT chat limit. If a refresh fails, the last values stay on screen marked as stale.
+- **Claude:** shows the snapshot you entered and marks it outdated after one hour. Values are never guessed.
+- The notch panel is a visual overlay, not an Apple API. It follows the main display, and macOS fullscreen or system UI can cover it. The menu-bar popover always works.
+
+## Limitations
+
+- Codex CLI output formats may change.
+- Global mouse monitoring may be restricted on managed devices; then use the menu-bar item.
+- Not an official Anthropic or OpenAI product.

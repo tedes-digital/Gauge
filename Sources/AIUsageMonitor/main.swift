@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mouseMonitor: Any?
     private var expanded = false
     private var lastNotchEnabled = true
+    private let badge = NSView()
+    private let badgeLabel = makeLabel("", size: 11, weight: .medium)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.instance = self
@@ -22,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchDashboard = DashboardViewController(model: model)
         popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 700, height: 360)
+        popover.contentSize = Layout.card
         popover.contentViewController = dashboard
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -72,13 +74,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastNotchEnabled = model.showNotch
             if model.showNotch { buildNotch() } else { notchPanel?.orderOut(nil); notchPanel = nil }
         }
-        if expanded { layoutNotch() }
+        if !expanded, notchPanel != nil { updateBadgeText() }
     }
+
+    private static let badgeSize = NSSize(width: 170, height: 28)
+    private static let inset: CGFloat = 10
 
     private func buildNotch() {
         guard NSScreen.main != nil else { return }
         if notchPanel == nil {
-            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 170, height: 28),
+            let panel = NSPanel(contentRect: NSRect(origin: .zero, size: Self.badgeSize),
                                 styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             panel.isOpaque = false
             panel.backgroundColor = .clear
@@ -88,37 +93,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.hidesOnDeactivate = false
             panel.isMovableByWindowBackground = false
             notchPanel = panel
+
+            badge.wantsLayer = true
+            badge.layer?.backgroundColor = NSColor.black.cgColor
+            badge.layer?.cornerRadius = 13
+            badgeLabel.alignment = .center
+            badgeLabel.frame = NSRect(x: 5, y: 6, width: Self.badgeSize.width - 10, height: 16)
+            badge.addSubview(badgeLabel)
         }
         layoutNotch()
         notchPanel?.orderFrontRegardless()
     }
 
+    private func updateBadgeText() {
+        let claude = model.claudeSession >= 0 ? "\(model.claudeSession)%" : "—"
+        let codex = model.shortestCodex.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "—"
+        badgeLabel.stringValue = "✳  \(claude)      ✦  \(codex)"
+    }
+
+    /// Resizes the panel and swaps between the compact badge and the usage card.
     private func layoutNotch() {
         guard let panel = notchPanel, let screen = NSScreen.main else { return }
-        let width: CGFloat = expanded ? 720 : 170
-        let height: CGFloat = expanded ? 380 : 28
-        // VisibleFrame is below the menu bar; use full frame to anchor to the physical notch.
-        let frame = NSRect(x: screen.frame.midX - width / 2,
-                           y: screen.frame.maxY - height,
-                           width: width, height: height)
-        panel.setFrame(frame, display: true, animate: expanded)
+        let size = expanded
+            ? NSSize(width: Layout.card.width + Self.inset * 2, height: Layout.card.height + Self.inset)
+            : Self.badgeSize
+        // Use the full frame (not visibleFrame) to anchor to the physical notch.
+        let frame = NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
+                           width: size.width, height: size.height)
+        panel.setFrame(frame, display: true)
         if expanded {
-            let card = NSView(frame: NSRect(origin: .zero, size: frame.size))
+            let host = NSView(frame: NSRect(origin: .zero, size: size))
             let view = notchDashboard.view
             view.removeFromSuperview()
-            view.frame = NSRect(x: 10, y: 10, width: 700, height: 360)
+            view.frame = NSRect(x: Self.inset, y: Self.inset, width: Layout.card.width, height: Layout.card.height)
             view.autoresizingMask = []
-            card.addSubview(view)
-            panel.contentView = card
+            host.addSubview(view)
+            panel.contentView = host
         } else {
-            let badge = NSView(frame: NSRect(origin: .zero, size: frame.size))
-            badge.wantsLayer = true
-            badge.layer?.backgroundColor = NSColor.black.cgColor
-            badge.layer?.cornerRadius = 13
-            let text = makeLabel("✳  \(model.claudeSession >= 0 ? "\(model.claudeSession)%" : "—")      ✦  \(model.shortestCodex.map { "\(Int($0.remainingPercent))%" } ?? "—")", size: 11, weight: .medium)
-            text.alignment = .center
-            text.frame = NSRect(x: 5, y: 6, width: width - 10, height: 16)
-            badge.addSubview(text)
+            updateBadgeText()
+            badge.frame = NSRect(origin: .zero, size: size)
             panel.contentView = badge
         }
     }
@@ -126,9 +139,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func checkMousePosition() {
         guard model.showNotch, let screen = NSScreen.main else { return }
         let mouse = NSEvent.mouseLocation
-        // Expand only when pointer approaches center top; collapse when clearly outside panel.
-        let hover = abs(mouse.x - screen.frame.midX) < (expanded ? 370 : 110)
-            && mouse.y > screen.frame.maxY - (expanded ? 390 : 42)
+        let top = screen.frame.maxY
+        // Expand when the pointer reaches the badge; collapse once it leaves the card area.
+        let hover = expanded
+            ? abs(mouse.x - screen.frame.midX) < Layout.card.width / 2 + Self.inset
+                && mouse.y > top - Layout.card.height - Self.inset - 8
+            : abs(mouse.x - screen.frame.midX) < Self.badgeSize.width / 2
+                && mouse.y > top - Self.badgeSize.height
         if hover != expanded {
             expanded = hover
             notchDashboard.update()
