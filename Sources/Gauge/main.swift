@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.target = self
         statusItem.button?.action = #selector(toggleMenu)
-        statusItem.button?.toolTip = "AI Usage Monitor · click to open"
+        statusItem.button?.toolTip = "Gauge · click to open"
         model.onChange = { [weak self] in self?.updateUI() }
         lastNotchEnabled = model.showNotch
         if model.showNotch { buildNotch() }

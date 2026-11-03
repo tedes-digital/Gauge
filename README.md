@@ -1,4 +1,4 @@
-# AI Usage Monitor
+# Gauge
 
 A tiny macOS menu-bar app that shows how much of your **Claude** and **ChatGPT (Codex)** usage is left. Hover the notch area at the top of the screen, or click the menu-bar item, to see a compact usage card.
 
@@ -8,8 +8,8 @@ A tiny macOS menu-bar app that shows how much of your **Claude** and **ChatGPT (
 
 ## Install
 
-1. Download `AIUsageMonitor.zip` from the [Releases](../../releases) page and unzip it.
-2. Move `AIUsageMonitor.app` to `/Applications`.
+1. Download `Gauge.zip` from the [Releases](../../releases) page and unzip it.
+2. Move `Gauge.app` to `/Applications`.
 3. The first time, right-click the app → **Open** → **Open** (the app is not notarized).
 
 Then connect your AI accounts:
@@ -26,8 +26,8 @@ Optional in Settings: notch panel on/off, low-usage notifications (20% / 10% / 0
 Requires Xcode Command Line Tools (`xcode-select --install`).
 
 ```bash
-swift run AIUsageMonitor      # run directly
-./build-app.sh                # builds dist/AIUsageMonitor.app and dist/AIUsageMonitor.zip
+swift run Gauge   # run directly
+./build-app.sh       # builds dist/Gauge.app and dist/Gauge.zip
 ```
 
 `build-app.sh` produces a universal, ad-hoc-signed bundle. For Launch at Login and notifications, use the `.app` rather than `swift run`.

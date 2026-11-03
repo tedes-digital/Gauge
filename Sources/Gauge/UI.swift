@@ -216,7 +216,7 @@ final class SettingsWindowController: NSWindowController {
     init(model: AppModel) {
         self.model = model
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 510), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        window.title = "AI Usage Monitor · Settings"
+        window.title = "Gauge · Settings"
         window.center()
         window.isReleasedWhenClosed = false
         super.init(window: window)

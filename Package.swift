@@ -2,8 +2,8 @@
 import PackageDescription
 
 let package = Package(
-    name: "AIUsageMonitor",
+    name: "Gauge",
     platforms: [.macOS(.v14)],
-    products: [.executable(name: "AIUsageMonitor", targets: ["AIUsageMonitor"])],
-    targets: [.executableTarget(name: "AIUsageMonitor")]
+    products: [.executable(name: "Gauge", targets: ["Gauge"])],
+    targets: [.executableTarget(name: "Gauge")]
 )
